@@ -1,6 +1,7 @@
 """Command-line entry point: `troupe config show|set|history`."""
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -9,6 +10,7 @@ from troupe.config import commands
 from troupe.errors import TroupeError
 
 PROG = "troupe"
+THEATRE_ENV = "TROUPE_THEATRE"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -22,8 +24,8 @@ def _parser() -> argparse.ArgumentParser:
         sub.add_argument(
             "--theatre",
             type=Path,
-            default=Path("."),
-            help="theatre directory (default: current directory)",
+            default=None,
+            help=f"theatre directory (default: ${THEATRE_ENV}, else current directory)",
         )
         return sub
 
@@ -40,7 +42,7 @@ def _parser() -> argparse.ArgumentParser:
 def run(argv: Sequence[str]) -> str:
     """Run a command and return its stdout; raises TroupeError on failure."""
     args = _parser().parse_args(argv)
-    theatre: Path = args.theatre
+    theatre: Path = args.theatre or Path(os.environ.get(THEATRE_ENV) or ".")
     if args.subcommand == "show":
         return commands.show(theatre, args.path)
     if args.subcommand == "set":

@@ -1,5 +1,7 @@
 """Usage errors → exit 2 with nothing on stdout."""
 
+from pathlib import Path
+
 import pytest
 
 from tests.conftest import Theatre, assert_failed
@@ -48,6 +50,18 @@ def test_theatre_option_before_positionals(ready: Theatre) -> None:
 
 def test_theatre_defaults_to_current_directory(ready: Theatre) -> None:
     result = ready.run("config", "show", "a", theatre=False, cwd=ready.root)
+    assert (result.code, result.out) == (0, "1\n")
+
+
+def test_theatre_defaults_to_environment_variable(ready: Theatre, tmp_path: Path) -> None:
+    other = Theatre(tmp_path / "other")
+    other.write("troupe.yml", "a: 2\n")
+    env = {"TROUPE_THEATRE": str(ready.root)}
+    result = ready.run("config", "show", "a", theatre=False, cwd=other.root, env=env)
+    assert (result.code, result.out) == (0, "1\n")
+    result = ready.run("config", "show", "a", "--theatre", str(other.root), theatre=False, env=env)
+    assert (result.code, result.out) == (0, "2\n")
+    result = ready.run("config", "show", "a", theatre=False, env={"TROUPE_THEATRE": ""})
     assert (result.code, result.out) == (0, "1\n")
 
 

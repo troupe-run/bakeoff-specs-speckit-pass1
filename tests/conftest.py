@@ -1,6 +1,7 @@
 """Shared fixtures: real theatres on disk, driven through the real `troupe` CLI."""
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -38,11 +39,20 @@ class Theatre:
             if path.is_file() and not path.name.startswith(STORE_FILENAME)
         }
 
-    def run(self, *args: str, theatre: bool = True, cwd: Path | None = None) -> "Result":
+    def run(
+        self,
+        *args: str,
+        theatre: bool = True,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> "Result":
         argv = [*COMMAND, *args]
         if theatre:
             argv += ["--theatre", str(self.root)]
-        done = subprocess.run(argv, capture_output=True, cwd=cwd or self.root, check=False)
+        environ = {k: v for k, v in os.environ.items() if k != "TROUPE_THEATRE"} | (env or {})
+        done = subprocess.run(
+            argv, capture_output=True, cwd=cwd or self.root, env=environ, check=False
+        )
         return Result(done.returncode, done.stdout.decode("utf-8"), done.stderr.decode("utf-8"))
 
     def config(self, *args: str) -> "Result":
