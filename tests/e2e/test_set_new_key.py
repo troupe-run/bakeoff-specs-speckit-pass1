@@ -137,3 +137,17 @@ def test_new_key_in_compact_list_item_mapping(theatre: Theatre) -> None:
     assert_set(
         theatre, files, "l.0.c", "3", {"troupe.yml": "l:\n  - a: 1\n    b: 2\n    c: 3\n  - z\n"}
     )
+
+
+def test_new_key_after_an_include_entry(theatre: Theatre) -> None:
+    files = {
+        "troupe.yml": "agents:\n  coder: file:agents/coder.yaml\nnext: 1\n",
+        "agents/coder.yaml": "model: x\n",
+    }
+    assert_set(
+        theatre,
+        files,
+        "agents.reviewer",
+        "y",
+        {"troupe.yml": ("agents:\n  coder: file:agents/coder.yaml\n  reviewer: y\nnext: 1\n")},
+    )

@@ -150,11 +150,11 @@ All e2e tests in this phase assert on the **exact bytes of every file** after th
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T046 [P] Add a short `README.md` at the repository root: what `troupe config` does, the three commands, exit codes table, and the quality-gate commands (link to `specs/001-config-load-show-set/`)
-- [ ] T047 Review every error message path: each `TroupeError` raised names the path or file (FR-008); add a parametrised e2e test in `tests/e2e/test_error_messages.py` that runs each failure fixture from T008/T009/T022/T037 and asserts the named path/file appears in stderr
-- [ ] T048 Ensure every decision lives in one place (Principle IV): grep for duplicated literals (`"troupe.yml"`, `"file:"`, `".troupe"`, exit-code integers, `"events.sqlite3"`) and fold any duplicate into its owning constant; add a one-line comment at each decision site citing its spec/research ID (D-n / R-n / B-n)
-- [ ] T049 Run the quickstart.md walk-through end to end and fix any deviation
-- [ ] T050 Run and show the full gates: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; report any failure with its output (Principle III)
+- [X] T046 [P] Add a short `README.md` at the repository root: what `troupe config` does, the three commands, exit codes table, and the quality-gate commands (link to `specs/001-config-load-show-set/`)
+- [X] T047 Review every error message path: each `TroupeError` raised names the path or file (FR-008); add a parametrised e2e test in `tests/e2e/test_error_messages.py` that runs each failure fixture from T008/T009/T022/T037 and asserts the named path/file appears in stderr
+- [X] T048 Ensure every decision lives in one place (Principle IV): grep for duplicated literals (`"troupe.yml"`, `"file:"`, `".troupe"`, exit-code integers, `"events.sqlite3"`) and fold any duplicate into its owning constant; add a one-line comment at each decision site citing its spec/research ID (D-n / R-n / B-n)
+- [X] T049 Run the quickstart.md walk-through end to end and fix any deviation
+- [X] T050 Run and show the full gates: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; report any failure with its output (Principle III)
 
 ---
 

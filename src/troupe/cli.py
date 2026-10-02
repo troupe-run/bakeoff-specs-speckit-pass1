@@ -15,16 +15,14 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=PROG, description="troupe AI orchestration tool")
     groups = parser.add_subparsers(dest="group", required=True, metavar="COMMAND")
     config = groups.add_parser("config", help="show, change and audit the theatre configuration")
+    theatre_help = "theatre directory (default: current directory)"
+    config.add_argument("--theatre", type=Path, default=Path("."), help=theatre_help)
     subcommands = config.add_subparsers(dest="subcommand", required=True, metavar="SUBCOMMAND")
 
     def add(name: str, help_text: str) -> argparse.ArgumentParser:
         sub = subcommands.add_parser(name, help=help_text)
-        sub.add_argument(
-            "--theatre",
-            type=Path,
-            default=Path("."),
-            help="theatre directory (default: current directory)",
-        )
+        # Also accepted after the subcommand; SUPPRESS keeps a value given before it.
+        sub.add_argument("--theatre", type=Path, default=argparse.SUPPRESS, help=theatre_help)
         return sub
 
     add("show", "print a setting's value").add_argument("path", metavar="PATH")

@@ -11,7 +11,7 @@ uv run troupe config set     PATH VALUE  [--theatre DIR]
 uv run troupe config history [PATH]      [--theatre DIR]
 ```
 
-- `--theatre DIR` may appear before or after the positional arguments of the subcommand; default `.`.
+- `--theatre DIR` may appear before or after the subcommand and its positional arguments; default `.`.
 - VALUE is one argv element (shell-quote it), parsed as one YAML 1.2 flow node (research R-3).
 - Negative numbers such as `-3` work as VALUE directly. A VALUE that begins with `-` followed by a
   non-digit may need to follow `--` (standard argparse convention), e.g. `troupe config set x -- -a`.
