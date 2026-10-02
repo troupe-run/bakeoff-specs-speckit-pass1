@@ -85,6 +85,7 @@ def plan_set(loaded: Loaded, path: ConfigPath, value: NewNode) -> EditPlan | Non
 
 @dataclass
 class _Context:
+    path: ConfigPath
     file: SourceFile
     lines: Lines
     spans: list[tuple[int, int]]
@@ -139,10 +140,10 @@ class _Context:
             self.splices.append((start, end, text))
 
 
-def _context(loaded: Loaded, file: SourceFile) -> _Context:
+def _context(loaded: Loaded, file: SourceFile, path: ConfigPath) -> _Context:
     lines = Lines(file.text)
     root = loaded.composed.get(file.path)
-    return _Context(file, lines, scalar_spans(root), indent_step(root, lines))
+    return _Context(path, file, lines, scalar_spans(root), indent_step(root, lines))
 
 
 # --- Block scalar geometry -----------------------------------------------------------------
@@ -223,16 +224,15 @@ def _after_indicator(ctx: _Context, owner: _Owner, target_start: int) -> int:
             offset += 1
         if offset < len(text) and text[offset] == ":":
             return offset + 1
-        raise WriteRefused(
-            f"{ctx.file.path}: cannot locate the ':' after key {owner.key.node.value!r}"
-        )
+        key = owner.key.node.value
+        raise WriteRefused(f"{ctx.path}: cannot locate the ':' after {key!r} in {ctx.file.path}")
     offset = target_start - 1
     while offset >= 0 and text[offset] in " \t\r\n":
         offset -= 1
     if offset >= 0 and text[offset] == "-":
         return offset + 1
     raise WriteRefused(
-        f"{ctx.file.path}: cannot locate the list item for the value at offset {target_start}"
+        f"{ctx.path}: cannot locate the list item in {ctx.file.path} at offset {target_start}"
     )
 
 
@@ -289,7 +289,7 @@ def _replace(
         return _replace_text_include(target, value, path, expected)
     if _same(target, expected):
         return None
-    ctx = _context(loaded, target.file)
+    ctx = _context(loaded, target.file, path)
     if isinstance(target, LocatedScalar):
         _replace_scalar(ctx, target, owner, value)
     else:
@@ -326,10 +326,13 @@ def _replace_scalar(ctx: _Context, target: LocatedScalar, owner: _Owner, value: 
     if target.style in (render.LITERAL, render.FOLDED):
         _replace_block_scalar(ctx, target, owner, owner_column, value)
         return
-    empty = target.start == target.end
+    empty = target.style is None and target.node.value == ""
+    # An empty value's end mark points at the next token; its real span is just after the
+    # `:` or `-`.
     start = _after_indicator(ctx, owner, target.start) if empty else target.start
+    end = start if empty else target.end
     lead = " " if empty else ""
-    line = ctx.lines.index_of(target.end)
+    line = ctx.lines.index_of(end)
     if isinstance(value, NewScalar):
         text_value = value.value
         if (
@@ -338,19 +341,15 @@ def _replace_scalar(ctx: _Context, target: LocatedScalar, owner: _Owner, value: 
             and render.literal_representable(text_value)
         ):
             header, lines = render.render_literal(text_value, owner_column + ctx.step, ctx.step)
-            ctx.inline(start, target.end, lead + header)
+            ctx.inline(start, end, lead + header)
             ctx.insert_after_line(line, lines)
             return
-        ctx.inline(
-            start, target.end, lead + render.render_inline(value, target.style, in_flow=False)
-        )
+        ctx.inline(start, end, lead + render.render_inline(value, target.style, in_flow=False))
         return
     if render.is_empty_collection(value):
-        ctx.inline(start, target.end, lead + render.render_flow(value))
+        ctx.inline(start, end, lead + render.render_flow(value))
         return
-    _scalar_to_block_collection(
-        ctx, owner, owner_column, start if empty else target.start, target.end, line, value
-    )
+    _scalar_to_block_collection(ctx, owner, owner_column, start, end, line, value)
 
 
 def _scalar_to_block_collection(
@@ -381,8 +380,8 @@ def _replace_block_scalar(
                 body = folded.rewrite(old_lines, block.content_column, text_value.rstrip("\n"))
             except folded.MoreIndented:
                 raise WriteRefused(
-                    f"{ctx.file.path}: the new value would put a more-indented line into the "
-                    f"folded value at line {block.header_line + 1}"
+                    f"{ctx.path}: the new value would put a more-indented line into the "
+                    f"folded value at line {block.header_line + 1} of {ctx.file.path}"
                 ) from None
             trailing = len(text_value) - len(text_value.rstrip("\n"))
             new_lines = body + ([""] * (trailing - 1) if chomp == "+" and trailing > 1 else [])
@@ -400,7 +399,7 @@ def _replace_block_scalar(
         header = block.indicator + digit + chomp
         if header != ctx.text[block.header_start : block.header_end]:
             ctx.inline(block.header_start, block.header_end, header)
-        last = block.last_block if block.chomp == "+" else block.last_text
+        last = block.last_block if "+" in (block.chomp, chomp) else block.last_text
         _replace_content(ctx, block, last, new_lines)
         return
     # The value is no longer a block scalar: write it inline and drop the old content lines.
@@ -510,7 +509,7 @@ def _new_key(
     nested: NewNode = value
     for segment in reversed(rest[1:]):
         nested = {segment: nested}
-    ctx = _context(loaded, mapping.file)
+    ctx = _context(loaded, mapping.file, path)
     last_key = mapping.entries[-1][0] if mapping.entries else None
     last_value = mapping.entries[-1][1] if mapping.entries else None
     key_style = (
@@ -524,9 +523,9 @@ def _new_key(
         entry = f"{key_text}: {render.render_flow(nested, value_style)}"
         if last_value is not None:
             end = content_end(ctx, last_value)
-            ctx.splices.append((end, end, ", " + entry))
+            ctx.inline(end, end, ", " + entry)
         else:
-            ctx.splices.append((mapping.start + 1, mapping.start + 1, entry))
+            ctx.inline(mapping.start + 1, mapping.start + 1, entry)
     else:
         key_text = render.render_key(rest[0], key_style, in_flow=False)
         if last_key is None:
@@ -560,16 +559,16 @@ def _append(
     path: ConfigPath,
 ) -> EditPlan:
     """FR-023: PATH ending in the list's length appends to the list."""
-    ctx = _context(loaded, sequence.file)
+    ctx = _context(loaded, sequence.file, path)
     last = sequence.items[-1] if sequence.items else None
     style = _style_of(last)
     if sequence.flow:
         text = render.render_flow(value, style)
         if last is not None:
             end = content_end(ctx, last)
-            ctx.splices.append((end, end, ", " + text))
+            ctx.inline(end, end, ", " + text)
         else:
-            ctx.splices.append((sequence.start + 1, sequence.start + 1, text))
+            ctx.inline(sequence.start + 1, sequence.start + 1, text)
     else:
         assert last is not None, "a block list always has an item"
         column = ctx.lines.column(sequence.start)

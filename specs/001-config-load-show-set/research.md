@@ -92,9 +92,10 @@ Library facts below were checked in a scratch project with `uv add eventsourcing
     contains no `: ` or ` #`, does not end in `:`, contains no `,[]{}` when in a flow context, and
     `resolve_plain(text)` gives back the same typed value.
   - *single-quoted*: single-line and no control characters (`'` doubled as `''`).
-  - *double-quoted*: always; escapes only `\\`, `\"` and control characters (C0, DEL, C1 and the
-    YAML line/paragraph separators U+2028/U+2029 via the named escapes `\0 \a \b \t \n \v \f \r \e
-    \N \L \P` or `\xXX`/`\uXXXX`); every other character literal.
+  - *double-quoted*: always; escapes only `\\`, `\"` and control characters (C0, DEL and C1, via
+    the named escapes `\0 \a \b \t \n \v \f \r \e \N` or `\xXX`); every other character —
+    including U+2028/U+2029, which are not control characters — is written literally (FR-028).
+    Plain and single-quoted styles are not used for strings containing U+FEFF, U+2028 or U+2029.
   Non-string scalars are written plain: integers in decimal, booleans `true`/`false`, null `null`,
   floats in the VALUE's own spelling when it came from the command line as a plain scalar
   (otherwise `repr()`, with `.inf`/`-.inf`/`.nan` for non-finite values).
@@ -211,3 +212,13 @@ These refine the contract where it is silent; each is the conservative option.
   per line in key order `seq, op, path, old, new`.
 - **B-12 Leaf order** is document order with includes expanded in place; empty collections have no
   leaves.
+- **B-13 Comments after a growing flow collection**: when a new entry is appended to a flow
+  collection, an end-of-line comment on that line returns to its previous column (one space if the
+  line now reaches it), the same rule FR-036 applies to changed values — so aligned comment columns
+  survive.
+- **B-14 Folded blocks with more-indented lines**: a folded value that already contains
+  more-indented lines cannot be split into foldable paragraphs reliably, so changing it is refused
+  (exit 3) rather than guessed at.
+- **B-15 Keep chomping and trailing blank lines**: when a literal block's chomping becomes (or is)
+  `+`, the blank lines that follow its content are part of the value and are replaced with it, so
+  they do not silently join the new value.
