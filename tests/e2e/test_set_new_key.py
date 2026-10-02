@@ -151,3 +151,14 @@ def test_new_key_after_an_include_entry(theatre: Theatre) -> None:
         "y",
         {"troupe.yml": ("agents:\n  coder: file:agents/coder.yaml\n  reviewer: y\nnext: 1\n")},
     )
+
+
+def test_new_key_after_a_keep_chomped_block_goes_below_its_blank_lines(theatre: Theatre) -> None:
+    files = {"troupe.yml": "m:\n  a: |+\n    t\n\nn: 1\n"}
+    assert_set(theatre, files, "m.b", "2", {"troupe.yml": "m:\n  a: |+\n    t\n\n  b: 2\nn: 1\n"})
+    assert theatre.config("show", "m.a").out == "t\n\n"
+
+
+def test_new_key_after_a_clip_block_stays_above_the_blank_separator(theatre: Theatre) -> None:
+    files = {"troupe.yml": "m:\n  a: |\n    t\n\nn: 1\n"}
+    assert_set(theatre, files, "m.b", "2", {"troupe.yml": "m:\n  a: |\n    t\n  b: 2\n\nn: 1\n"})

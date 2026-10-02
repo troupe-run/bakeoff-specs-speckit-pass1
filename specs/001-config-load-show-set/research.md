@@ -232,3 +232,7 @@ These refine the contract where it is silent; each is the conservative option.
   written (the `file:` string) rather than by the included content; the event's `new` is the
   loaded value (the target's text, for a text include). If the include cannot load (missing
   target, cycle), the write is refused (exit 3) with a message naming the target.
+- **B-18 Insertion after keep-chomped blocks**: a new key or list item that follows a collection
+  whose last value is a keep-chomped (`|+` / `>+`) block scalar goes below that block's trailing
+  blank lines, because those lines are part of its value (B-15); after any other value, blank
+  lines directly above the next section stay below the new entry (R-11).

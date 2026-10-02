@@ -254,6 +254,31 @@ def content_end(ctx: _Context, node: Located) -> int:
     return content_end(ctx, node.items[-1]) if node.items else node.end
 
 
+def _last_line(ctx: _Context, node: Located) -> int:
+    """Index of the last line `node` occupies in its file.
+
+    Trailing blank lines are not part of an entry, except after a keep-chomped (`+`) block
+    scalar, whose trailing blank lines belong to its value (research B-15).
+    """
+    tail = node
+    while tail.included_by is None:
+        if isinstance(tail, LocatedMapping) and tail.entries and not tail.flow:
+            tail = tail.entries[-1][1]
+        elif isinstance(tail, LocatedSequence) and tail.items and not tail.flow:
+            tail = tail.items[-1]
+        else:
+            break
+    if (
+        tail.included_by is None
+        and isinstance(tail, LocatedScalar)
+        and tail.style in (render.LITERAL, render.FOLDED)
+    ):
+        block = _block_scalar(ctx, tail, _column_before(ctx, tail.start))
+        if block.chomp == "+":
+            return block.last_block
+    return last_content_line(ctx.lines, content_end(ctx, node))
+
+
 def _column_before(ctx: _Context, offset: int) -> int:
     """Indentation of the line holding `offset` (an approximation of a block scalar's parent)."""
     return indent_of(ctx.lines.content(ctx.lines.index_of(offset)))
@@ -457,7 +482,7 @@ def _replace_collection(
         return
     # Block collection (research B-4 / B-5).
     first_line = ctx.lines.index_of(target.start)
-    last_line = last_content_line(ctx.lines, content_end(ctx, target))
+    last_line = _last_line(ctx, target)
     line_start = ctx.lines[first_line].start
     compact = ctx.text[line_start : target.start].strip(" ") != ""
     column = ctx.lines.column(target.start)
@@ -534,7 +559,7 @@ def _new_key(
         else:
             column = ctx.lines.column(last_key.start)
             assert last_value is not None
-            last = last_content_line(ctx.lines, content_end(ctx, last_value))
+            last = _last_line(ctx, last_value)
             after = insertion_line(ctx.lines, last, column)
         inline, following = render.render_value_lines(
             nested, column + ctx.step, ctx.step, value_style
@@ -572,7 +597,7 @@ def _append(
     else:
         assert last is not None, "a block list always has an item"
         column = ctx.lines.column(sequence.start)
-        last_line = last_content_line(ctx.lines, content_end(ctx, last))
+        last_line = _last_line(ctx, last)
         after = insertion_line(ctx.lines, last_line, column)
         ctx.insert_after_line(after, render.render_list_item(value, column, ctx.step, style))
     rest = (path.segments[-1],)

@@ -67,3 +67,8 @@ def test_append_multi_line_string(theatre: Theatre) -> None:
         '"x\\ny\\n"',
         {"troupe.yml": "l:\n  - a\n  - |\n    x\n    y\n"},
     )
+
+
+def test_append_after_a_keep_chomped_item_goes_below_its_blank_lines(theatre: Theatre) -> None:
+    files = {"troupe.yml": "l:\n  - >+\n    t\n\nz: 1\n"}
+    assert_set(theatre, files, "l.1", "x", {"troupe.yml": "l:\n  - >+\n    t\n\n  - x\nz: 1\n"})
