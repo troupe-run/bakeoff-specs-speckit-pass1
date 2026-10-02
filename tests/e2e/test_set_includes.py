@@ -68,3 +68,43 @@ def test_file_included_twice_changes_once_and_both_paths_read_it(theatre: Theatr
 def test_text_file_included_twice(theatre: Theatre) -> None:
     files = {"troupe.yml": "a: file:t.md\nb: file:t.md\n", "t.md": "x"}
     assert_set(theatre, files, "b", "y", {"t.md": "y"})
+
+
+def test_value_set_to_a_text_include_string(theatre: Theatre) -> None:
+    files = {"troupe.yml": "p: x  # prompt\n", "o.md": "other\n"}
+    assert_set(theatre, files, "p", "file:o.md", {"troupe.yml": "p: file:o.md # prompt\n"})
+    assert theatre.config("show", "p").out == "other\n"
+    assert theatre.history()[-1] == {
+        "seq": 2,
+        "op": "set",
+        "path": "p",
+        "old": "x",
+        "new": "other\n",
+    }
+
+
+def test_value_set_to_a_yaml_include_string(theatre: Theatre) -> None:
+    files = {"troupe.yml": "agents:\n  coder: none\n", "c.yaml": "model: m\n"}
+    assert_set(
+        theatre,
+        files,
+        "agents.coder",
+        "file:c.yaml",
+        {"troupe.yml": "agents:\n  coder: file:c.yaml\n"},
+    )
+    assert theatre.config("show", "agents.coder.model").out == "m\n"
+
+
+def test_include_string_inside_a_new_collection(theatre: Theatre) -> None:
+    files = {"troupe.yml": "a: 1\n", "o.md": "hi"}
+    assert_set(
+        theatre, files, "b", "{p: 'file:o.md'}", {"troupe.yml": "a: 1\nb:\n  p: file:o.md\n"}
+    )
+
+
+def test_include_string_with_a_missing_target_is_refused(theatre: Theatre) -> None:
+    assert_refused(theatre, {"troupe.yml": "p: x\n"}, "p", "file:gone.md", 3, "gone.md")
+
+
+def test_include_string_that_would_form_a_cycle_is_refused(theatre: Theatre) -> None:
+    assert_refused(theatre, {"troupe.yml": "p: x\n"}, "p", "file:troupe.yml", 3, "troupe.yml")

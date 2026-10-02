@@ -5,7 +5,7 @@ from pathlib import Path
 
 from troupe.config.edit.planner import EditPlan, plan_set
 from troupe.config.files import atomic_write, check_writable
-from troupe.config.leaves import LeafEvent, diff_events, leaves, to_value
+from troupe.config.leaves import LeafEvent, diff_events, leaves, to_value, written_value
 from troupe.config.loader import Loaded, load
 from troupe.config.paths import ConfigPath, dotted_is_within
 from troupe.config.scalars import NewNode, Scalar, scalars_equal
@@ -69,7 +69,12 @@ def _verify(
             node = _resolve(after_loaded.root, target)
         except TroupeError:
             raise _refuse(plan, path, f"{target} would not exist afterwards") from None
-        if not scalars_equal(to_value(node), plan.expected):
+        # A text-include write is checked by its loaded text; any other value by what is
+        # written, so a `file:` string read back as the include it now names still matches.
+        if not (
+            scalars_equal(to_value(node), plan.expected)
+            or scalars_equal(written_value(node), plan.expected)
+        ):
             raise _refuse(plan, path, f"{target} would not read back as the requested value")
     for leaf in set(before) | set(after):
         if any(dotted_is_within(leaf, target) for target in targets):

@@ -227,3 +227,8 @@ These refine the contract where it is silent; each is the conservative option.
   checked before the write, so a read-only file is never silently replaced by the atomic rename
   and a change is never written without its events. Any other failure to open or use the event
   store is a load error (exit 4) naming the store's file; no command ends in a traceback.
+- **B-17 Setting a value to a `file:` string**: VALUE `file:x` is a string (FR-005), and once
+  written it is an include (FR-010). `set` writes it like any string and verifies it by what is
+  written (the `file:` string) rather than by the included content; the event's `new` is the
+  loaded value (the target's text, for a text include). If the include cannot load (missing
+  target, cycle), the write is refused (exit 3) with a message naming the target.

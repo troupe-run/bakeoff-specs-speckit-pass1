@@ -52,6 +52,19 @@ def to_value(node: Located) -> Value:
     raise TypeError(node)
 
 
+def written_value(node: Located) -> Value:
+    """The value as written in the files: includes appear as their `file:` strings."""
+    if node.included_by is not None:
+        return node.included_by.value
+    if isinstance(node, TextInclude):
+        return node.include.value
+    if isinstance(node, LocatedMapping):
+        return {str(key.node.value): written_value(value) for key, value in node.entries}
+    if isinstance(node, LocatedSequence):
+        return [written_value(item) for item in node.items]
+    return node.value
+
+
 def diff_events(before: dict[str, Scalar], after: dict[str, Scalar]) -> list[LeafEvent]:
     """`set` events in `after` order, then `remove` events in `before` order (spec D-3)."""
     events: list[LeafEvent] = []
