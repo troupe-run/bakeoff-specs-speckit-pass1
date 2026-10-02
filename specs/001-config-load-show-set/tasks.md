@@ -217,3 +217,7 @@ T038 edit/render.py   T039 edit/layout.py   T040 edit/folded.py
 ## Phase 8: Convergence
 
 - [X] T054 Allow `set PATH VALUE` where VALUE is a string starting with `file:` (it becomes an include once written): in `src/troupe/config/edit/apply.py` verify such a value against the loaded include (the target's text, or the embedded YAML) instead of the literal string, and when the include cannot load (missing target, cycle) refuse with exit 3 and a message naming the include target rather than "would not read back"; add e2e tests in `tests/e2e/test_set_includes.py` (text target, YAML target, missing target refused with files unchanged) and record the decision in `specs/001-config-load-show-set/research.md` per FR-020, FR-010, FR-008 (partial)
+
+## Phase 9: Convergence
+
+- [ ] T055 Place new mapping keys and list items after the trailing blank lines of a preceding keep-chomped (`|+` / `>+`) block scalar, since those lines are part of its value: make `content_end` in `src/troupe/config/edit/planner.py` end a `+` block at its last block line rather than its last non-blank line, so `set m.b 2` on `m:\n  a: |+\n    t\n\nn: 1\n` writes `  b: 2` after the blank line instead of being refused; add e2e tests in `tests/e2e/test_set_new_key.py` and `tests/e2e/test_set_append.py` per FR-022, FR-033, research B-15 (partial)
