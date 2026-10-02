@@ -207,3 +207,9 @@ T038 edit/render.py   T039 edit/layout.py   T040 edit/folded.py
 2. Add US3 (history).
 3. Polish and run all gates. Each commit message says why (Principle VI). The work counts as done
    only once it is committed on `main`.
+
+## Phase 7: Convergence
+
+- [ ] T051 CRITICAL: Catch storage and file-write failures (e.g. `sqlite3.OperationalError` from an unwritable `.troupe/`, `OSError` from `atomic_write` in `src/troupe/config/files.py`) and turn them into `TroupeError`s with documented exit codes (write failures → `WriteRefused`, exit 3, no file changed; an unreadable/unwritable event store → `LoadError`, exit 4) whose messages name the file, so no command ever exits 1 with a traceback; add e2e tests in `tests/e2e/test_state.py` with a read-only `.troupe/` directory per Constitution I, FR-007, FR-008 (contradicts)
+- [ ] T052 CRITICAL: Refuse `set` (exit 3, naming the file, nothing changed) when the file holding the value is not writable by the user, instead of letting `os.replace` in `src/troupe/config/files.py` replace a read-only file; add an e2e test in `tests/e2e/test_state.py` with a `0444` `troupe.yml` per Constitution I, FR-003 (contradicts)
+- [ ] T053 Review the extra `--theatre` placement before the subcommand in `src/troupe/cli.py`: either record it as a decision in `specs/001-config-load-show-set/spec.md` (Decisions on open points) or remove it with its test in `tests/e2e/test_usage.py` per FR-001, Constitution V (unrequested)
