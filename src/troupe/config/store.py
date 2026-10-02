@@ -1,15 +1,21 @@
 """The event-sourced projection of the configuration, persisted under `.troupe/` (research R-4)."""
 
+import os
+import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from eventsourcing.application import AggregateNotFoundError, Application
 from eventsourcing.domain import Aggregate, event
+from eventsourcing.persistence import PersistenceError
 
 from troupe.config.files import TROUPE_DIR
 from troupe.config.leaves import LeafEvent, Op
 from troupe.config.scalars import Scalar
+from troupe.errors import LoadError, WriteRefused
 
 STORE_FILENAME = "events.sqlite3"
 CONFIG_AGGREGATE_ID = uuid5(NAMESPACE_URL, "troupe:theatre-config")
@@ -48,19 +54,43 @@ class _ConfigApplication(Application[UUID]):
     pass
 
 
+_STORE_ERRORS = (sqlite3.Error, PersistenceError, OSError)
+
+
 class ConfigStore:
+    """The theatre's event store. Failures to use it are LoadErrors naming the store's file, so
+    no command ever ends in a traceback (FR-007, FR-008)."""
+
     def __init__(self, theatre: Path) -> None:
-        database = theatre / TROUPE_DIR / STORE_FILENAME
-        self._app = _ConfigApplication(
-            env={
-                "PERSISTENCE_MODULE": "eventsourcing.sqlite",
-                "SQLITE_DBNAME": str(database),
-            }
-        )
+        self.database = theatre / TROUPE_DIR / STORE_FILENAME
+        with self._guard():
+            self._app = _ConfigApplication(
+                env={
+                    "PERSISTENCE_MODULE": "eventsourcing.sqlite",
+                    "SQLITE_DBNAME": str(self.database),
+                }
+            )
+
+    @contextmanager
+    def _guard(self) -> Iterator[None]:
+        try:
+            yield
+        except _STORE_ERRORS as error:
+            raise LoadError(f"{self.database}: cannot use the event store: {error}") from None
+
+    def check_writable(self) -> None:
+        """Refuse a change up front if its events could not be recorded afterwards."""
+        directory = self.database.parent
+        files = [self.database, *directory.glob(STORE_FILENAME + "-*")]
+        if not os.access(directory, os.W_OK) or not all(os.access(f, os.W_OK) for f in files):
+            raise WriteRefused(
+                f"{self.database}: the event store is not writable; no file was changed"
+            )
 
     def _get(self) -> TheatreConfig | None:
         try:
-            aggregate: object = self._app.repository.get(CONFIG_AGGREGATE_ID)
+            with self._guard():
+                aggregate: object = self._app.repository.get(CONFIG_AGGREGATE_ID)
         except AggregateNotFoundError:
             return None
         assert isinstance(aggregate, TheatreConfig)
@@ -73,7 +103,8 @@ class ConfigStore:
         aggregate = TheatreConfig()
         for path, value in leaves.items():
             aggregate.change("import", path, None, value)
-        self._app.save(aggregate)
+        with self._guard():
+            self._app.save(aggregate)
 
     def record(self, events: list[LeafEvent]) -> None:
         if not events:
@@ -82,7 +113,8 @@ class ConfigStore:
         assert aggregate is not None, "record() before import"
         for item in events:
             aggregate.change(item.op, item.path, item.old, item.new)
-        self._app.save(aggregate)
+        with self._guard():
+            self._app.save(aggregate)
 
     def history(self) -> list[HistoryRecord]:
         aggregate = self._get()

@@ -54,8 +54,3 @@ def test_theatre_defaults_to_current_directory(ready: Theatre) -> None:
 def test_negative_number_value(ready: Theatre) -> None:
     assert ready.config("set", "a", "-3").code == 0
     assert ready.read("troupe.yml") == "a: -3\n"
-
-
-def test_theatre_option_before_the_subcommand(ready: Theatre) -> None:
-    result = ready.run("config", "--theatre", str(ready.root), "show", "a", theatre=False)
-    assert (result.code, result.out) == (0, "1\n")

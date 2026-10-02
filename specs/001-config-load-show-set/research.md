@@ -222,3 +222,8 @@ These refine the contract where it is silent; each is the conservative option.
 - **B-15 Keep chomping and trailing blank lines**: when a literal block's chomping becomes (or is)
   `+`, the blank lines that follow its content are part of the value and are replaced with it, so
   they do not silently join the new value.
+- **B-16 Permission and storage failures**: `set` refuses (exit 3, naming the file, nothing
+  changed) when the file holding the value, its directory, or the event store is not writable —
+  checked before the write, so a read-only file is never silently replaced by the atomic rename
+  and a change is never written without its events. Any other failure to open or use the event
+  store is a load error (exit 4) naming the store's file; no command ends in a traceback.

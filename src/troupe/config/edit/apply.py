@@ -1,9 +1,10 @@
 """Verify a planned change by re-loading it, then write it (research R-7)."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 from troupe.config.edit.planner import EditPlan, plan_set
-from troupe.config.files import atomic_write
+from troupe.config.files import atomic_write, check_writable
 from troupe.config.leaves import LeafEvent, diff_events, leaves, to_value
 from troupe.config.loader import Loaded, load
 from troupe.config.paths import ConfigPath, dotted_is_within
@@ -12,8 +13,17 @@ from troupe.config.tree import Located, LocatedMapping, LocatedSequence, TextInc
 from troupe.errors import LoadError, TroupeError, WriteRefused
 
 
-def apply_set(theatre: Path, loaded: Loaded, path: ConfigPath, value: NewNode) -> list[LeafEvent]:
-    """Plan, verify and write `set PATH VALUE`; returns the leaf events it caused."""
+def apply_set(
+    theatre: Path,
+    loaded: Loaded,
+    path: ConfigPath,
+    value: NewNode,
+    before_write: Callable[[], None] = lambda: None,
+) -> list[LeafEvent]:
+    """Plan, verify and write `set PATH VALUE`; returns the leaf events it caused.
+
+    `before_write` runs just before the file is written; it raises to refuse the write.
+    """
     plan = plan_set(loaded, path, value)
     if plan is None or plan.new_text == plan.file.text:
         return []
@@ -21,6 +31,8 @@ def apply_set(theatre: Path, loaded: Loaded, path: ConfigPath, value: NewNode) -
     after_loaded = _reload(theatre, plan, path)
     after = leaves(after_loaded.root)
     _verify(loaded, after_loaded, plan, path, before, after)
+    check_writable(plan.file.path)
+    before_write()
     atomic_write(plan.file.path, plan.new_text)
     return diff_events(before, after)
 

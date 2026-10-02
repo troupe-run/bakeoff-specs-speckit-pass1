@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from troupe.errors import LoadError
+from troupe.errors import LoadError, WriteRefused
 
 TROUPE_DIR = ".troupe"
 CONFIG_NAMES = ("troupe.yml", "troupe.yaml")
@@ -68,11 +68,31 @@ def read_source(path: Path) -> SourceFile:
     return SourceFile(path, text, "yaml" if is_yaml_name(path) else "text")
 
 
+def check_writable(path: Path) -> None:
+    """Refuse to replace a file the user could not write themselves (Constitution I).
+
+    The atomic replace only needs the directory to be writable, so without this check a
+    read-only file would be silently overwritten.
+    """
+    if not os.access(path, os.W_OK):
+        raise WriteRefused(f"{path}: file is not writable; no file was changed")
+    if not os.access(path.parent, os.W_OK):
+        raise WriteRefused(f"{path}: its directory is not writable; no file was changed")
+
+
 def atomic_write(path: Path, text: str) -> None:
     """Replace a file's content all at once, so it is never left half-written (spec D-8)."""
     data = text.encode("utf-8")
     if path.read_bytes() == data:
         return
+    check_writable(path)
+    try:
+        _replace(path, data)
+    except OSError as error:
+        raise WriteRefused(f"{path}: cannot write: {error.strerror}; no file was changed") from None
+
+
+def _replace(path: Path, data: bytes) -> None:
     mode = stat.S_IMODE(path.stat().st_mode)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:

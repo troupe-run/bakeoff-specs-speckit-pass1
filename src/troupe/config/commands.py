@@ -83,7 +83,7 @@ def set_value(theatre: Path, path_text: str, value_text: str) -> str:
     path = ConfigPath.parse(path_text)
     value = parse_value(value_text)
     loaded, store = open_theatre(theatre)
-    events = apply_set(theatre, loaded, path, value)
+    events = apply_set(theatre, loaded, path, value, before_write=store.check_writable)
     store.record(events)
     return ""
 
