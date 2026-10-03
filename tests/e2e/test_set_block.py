@@ -100,3 +100,10 @@ def test_literal_followed_by_less_indented_comment(theatre: Theatre) -> None:
 def test_refused_change_leaves_files_alone(theatre: Theatre) -> None:
     files = {"troupe.yml": "p: >\n  some text\n"}
     assert_refused(theatre, files, "p", '" leading"', 3, "p")
+
+
+def test_value_starting_with_a_spaces_only_line_gets_an_indentation_indicator(
+    theatre: Theatre,
+) -> None:
+    files = {"troupe.yml": "k: x\n"}
+    assert_set(theatre, files, "k", '"    \\nabc\\n"', {"troupe.yml": "k: |2\n      \n  abc\n"})

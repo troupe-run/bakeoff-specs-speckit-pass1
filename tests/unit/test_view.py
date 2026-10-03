@@ -175,3 +175,29 @@ def test_yaml_includes_are_embedded_in_place_in_document_order(tmp_path: Path) -
 def test_empty_yaml_include_is_null(tmp_path: Path) -> None:
     write(tmp_path, "e.yaml", "")
     assert view(tmp_path, "k: file:e.yaml\n") == "k: null\n"
+
+
+SPACE_FIRST = "    \nabc\n"  # a whitespace-only line longer than the content indentation
+
+
+def test_text_include_starting_with_a_spaces_only_line_reads_back(tmp_path: Path) -> None:
+    write(tmp_path, "p.md", SPACE_FIRST)
+    out = view(tmp_path, "p: file:p.md\nq: 1\n")
+    assert out == "p: |2\n      \n  abc\nq: 1\n"
+    assert read_back(out) == {"p": SPACE_FIRST, "q": 1}
+
+
+def test_string_starting_with_a_spaces_only_line_in_a_list_item_reads_back(tmp_path: Path) -> None:
+    out = view(tmp_path, 'l:\n  - k: "  \\n\\nx"\n  - "   \\ny\\n"\n')
+    assert read_back(out) == {"l": [{"k": "  \n\nx"}, "   \ny\n"]}
+
+
+def test_top_level_text_include_starting_with_a_spaces_only_line_reads_back(
+    tmp_path: Path,
+) -> None:
+    write(tmp_path, "p.md", SPACE_FIRST)
+    write(tmp_path, "troupe.yml", "p: file:p.md\n")
+    loaded = load(tmp_path)
+    out = render(resolve(loaded.root, ConfigPath.parse("p")), tmp_path, sources=True)
+    assert out == "|2 # from .troupe/p.md\n      \n  abc\n"
+    assert read_back(out) == SPACE_FIRST

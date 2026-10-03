@@ -133,3 +133,11 @@ def test_theatre_reached_through_a_symlink(ready: Theatre, tmp_path: Path) -> No
     os.symlink(ready.root, link)
     result = ready.run("config", "show", "--sources", "--theatre", str(link), theatre=False)
     assert result.out == WHOLE
+
+
+def test_same_file_included_twice_is_shown_in_full_under_both_keys(theatre: Theatre) -> None:
+    theatre.write("troupe.yml", "a: file:s.yaml\nb: file:s.yaml\n")
+    theatre.write("s.yaml", "k: 1\n")
+    assert sources(theatre) == (
+        "a:\n  k: 1 # from .troupe/s.yaml\nb:\n  k: 1 # from .troupe/s.yaml\n"
+    )

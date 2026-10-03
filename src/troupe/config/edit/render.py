@@ -159,11 +159,14 @@ def block_content_lines(value: str, chomp: str) -> list[str]:
 
 
 def needs_indent_indicator(value: str) -> bool:
-    """A literal block whose first non-blank line starts with a space needs an explicit
-    indentation indicator."""
+    """A literal block needs an explicit indentation indicator when its first non-blank line
+    starts with a space, or when a spaces-only line comes before it: YAML takes the indentation
+    from the first non-blank line and rejects a leading line indented further than that."""
     for line in value.split("\n"):
         if line.strip(" ") != "":
             return line.startswith(" ")
+        if line:
+            return True
     return False
 
 
