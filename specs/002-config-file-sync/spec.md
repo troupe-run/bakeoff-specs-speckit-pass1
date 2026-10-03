@@ -216,7 +216,9 @@ Numbering continues from step 1 (FR-001 – FR-044 remain in force) at FR-100.
 - **FR-113**: Includes MUST be followed when reconciling exactly as when loading (step 1 FR-010 –
   FR-012); leaves of an include added by a hand edit MUST appear as `set` events.
 - **FR-114**: The events of one reconcile MUST be ordered `set` events in document order of the files,
-  then `remove` events in document order of the recorded configuration (same order as step 1 D-3).
+  then `remove` events in the order the recorded configuration holds its leaves (the order in which
+  they were first recorded). (`set` keeps step 1's order, D-3: its removes follow the files before the
+  change; under FR-120 that is the same set of leaves.)
 - **FR-115**: The events of one reconcile MUST be recorded all together or not at all.
 - **FR-116**: A reconcile when nothing differs MUST record nothing.
 
