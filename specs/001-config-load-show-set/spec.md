@@ -253,7 +253,8 @@ then `config history` and `config history <path>`, and compare the JSON Lines ou
 
 Recorded per Constitution Principles V and VI; each is the conservative reading of the contract.
 
-- **D-1 Files are the source of truth for values.** `show` and `set` read the configuration from the
+- **D-1 Files are the source of truth for values.** *(Superseded in part by step 2: hand edits are now
+  recorded by reconciling — see `specs/002-config-file-sync/spec.md`, FR-110 – FR-122.)* `show` and `set` read the configuration from the
   files as they are at that moment, so hand edits are always respected. The event store records
   history; it is not consulted to answer `show`. A `set`'s events are computed by comparing the
   configuration loaded from the files immediately before and after the change. Hand edits made between

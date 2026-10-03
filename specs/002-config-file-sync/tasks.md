@@ -125,10 +125,10 @@ Single project: `src/troupe/`, `tests/` at the repository root (plan.md → Proj
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T024 [P] Update `README.md`: add `uv run troupe config watch [--theatre DIR]` to the command list with one line ("record hand edits as they happen; stop with Ctrl-C"); note that every command except `history` first records hand edits made since the last command; mention `events.sqlite3.lock` next to the event store; link `specs/002-config-file-sync/`
-- [ ] T025 [P] Mark step 1 spec D-1 as superseded in `specs/001-config-load-show-set/spec.md` with a one-line pointer to `specs/002-config-file-sync/spec.md` (Principle VI: spec and code agree)
-- [ ] T026 Walk through `specs/002-config-file-sync/quickstart.md` by hand and confirm each expected output
-- [ ] T027 Run the full gates and show output: `uv run pytest` (run the watch tests 5 times in a row to check for flakiness: `for i in 1 2 3 4 5; do uv run pytest tests/e2e/test_watch*.py -q || break; done`), `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; report any failure with its output
+- [X] T024 [P] Update `README.md`: add `uv run troupe config watch [--theatre DIR]` to the command list with one line ("record hand edits as they happen; stop with Ctrl-C"); note that every command except `history` first records hand edits made since the last command; mention `events.sqlite3.lock` next to the event store; link `specs/002-config-file-sync/`
+- [X] T025 [P] Mark step 1 spec D-1 as superseded in `specs/001-config-load-show-set/spec.md` with a one-line pointer to `specs/002-config-file-sync/spec.md` (Principle VI: spec and code agree)
+- [X] T026 Walk through `specs/002-config-file-sync/quickstart.md` by hand and confirm each expected output
+- [X] T027 Run the full gates and show output: `uv run pytest` (run the watch tests 5 times in a row to check for flakiness: `for i in 1 2 3 4 5; do uv run pytest tests/e2e/test_watch*.py -q || break; done`), `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; report any failure with its output
 
 ---
 

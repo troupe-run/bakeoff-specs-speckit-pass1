@@ -9,6 +9,7 @@ disturbing the hand-written files, and records every change as an event.
 uv run troupe config show PATH          [--theatre DIR]   # print a scalar setting
 uv run troupe config set PATH VALUE     [--theatre DIR]   # change it in the file that holds it
 uv run troupe config history [PATH]     [--theatre DIR]   # list changes as JSON Lines
+uv run troupe config watch              [--theatre DIR]   # record hand edits as they happen
 ```
 
 - `PATH` is dotted (`agents.coder.model`); a digit segment indexes a list (`tools.0`).
@@ -17,7 +18,12 @@ uv run troupe config history [PATH]     [--theatre DIR]   # list changes as JSON
 - `set` changes only the bytes of the value: comments, quoting, indentation and layout elsewhere
   stay exactly as written. Every edit is re-read and checked before the file is replaced; if it
   cannot be written safely, nothing changes and the command exits 3.
-- State (the event store) lives in `<theatre>/.troupe/events.sqlite3`.
+- Hand edits are recorded too: every command except `history` first records, as `set`/`remove`
+  events, whatever was edited in the files since the last command. `watch` does the same within
+  2 seconds of each edit until you stop it (Ctrl-C or SIGTERM); a formatting- or comment-only edit
+  records nothing, and a `set` made while `watch` runs is recorded once.
+- State (the event store) lives in `<theatre>/.troupe/events.sqlite3`, with
+  `events.sqlite3.lock` beside it so that concurrent commands record each change once.
 
 | Exit | Meaning |
 |---|---|
@@ -36,4 +42,6 @@ uv run mypy --strict src tests
 uv run ruff check . && uv run ruff format --check .
 ```
 
-Specification, design decisions and task list: [`specs/001-config-load-show-set/`](specs/001-config-load-show-set/).
+Specification, design decisions and task list: [`specs/001-config-load-show-set/`](specs/001-config-load-show-set/)
+(load, show, set, history) and [`specs/002-config-file-sync/`](specs/002-config-file-sync/) (sync with
+files, watch).
