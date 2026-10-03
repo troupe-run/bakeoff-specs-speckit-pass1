@@ -23,7 +23,6 @@ def _parser() -> argparse.ArgumentParser:
         sub = subcommands.add_parser(name, help=help_text)
         sub.add_argument(
             "--theatre",
-            type=Path,
             default=None,
             help=f"theatre directory (default: ${THEATRE_ENV}, else current directory)",
         )
@@ -36,13 +35,35 @@ def _parser() -> argparse.ArgumentParser:
     add("history", "list configuration changes as JSON Lines").add_argument(
         "path", metavar="PATH", nargs="?"
     )
+    add("watch", "record hand edits to the configuration as they happen")
     return parser
+
+
+def theatre_display(theatre_arg: str | None) -> str:
+    """The theatre as the user named it: `--theatre`, else $TROUPE_THEATRE, as given; else the
+    absolute current directory, never a bare `.` (spec D-11)."""
+    return theatre_arg or os.environ.get(THEATRE_ENV) or str(Path.cwd())
+
+
+def error_line(message: str) -> str:
+    return f"{PROG}: error: {message}"
+
+
+def _announce(line: str) -> None:
+    sys.stdout.buffer.write(line.encode("utf-8"))
+    sys.stdout.flush()
+
+
+def _report(message: str) -> None:
+    print(error_line(message), file=sys.stderr, flush=True)
 
 
 def run(argv: Sequence[str]) -> str:
     """Run a command and return its stdout; raises TroupeError on failure."""
     args = _parser().parse_args(argv)
-    theatre: Path = args.theatre or Path(os.environ.get(THEATRE_ENV) or ".")
+    theatre = Path(args.theatre or os.environ.get(THEATRE_ENV) or ".")
+    if args.subcommand == "watch":
+        return commands.watch(theatre, theatre_display(args.theatre), _announce, _report)
     if args.subcommand == "show":
         return commands.show(theatre, args.path)
     if args.subcommand == "set":
@@ -54,7 +75,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     try:
         output = run(sys.argv[1:] if argv is None else argv)
     except TroupeError as error:
-        print(f"{PROG}: error: {error.message}", file=sys.stderr)
+        print(error_line(error.message), file=sys.stderr)
         sys.exit(error.exit_code)
     sys.stdout.buffer.write(output.encode("utf-8"))
     sys.stdout.flush()

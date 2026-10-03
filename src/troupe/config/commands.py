@@ -1,6 +1,9 @@
 """The `troupe config` subcommands: show, set, history, watch."""
 
 import json
+import signal
+import threading
+from collections.abc import Callable
 from pathlib import Path
 
 from troupe.config.edit.apply import apply_set
@@ -12,6 +15,7 @@ from troupe.config.scalars import format_scalar, parse_value
 from troupe.config.store import ConfigStore
 from troupe.config.sync import reconcile as reconcile_files
 from troupe.config.tree import Located, LocatedMapping, LocatedSequence, TextInclude
+from troupe.config.watch import run_watch
 from troupe.errors import PathError
 
 
@@ -116,3 +120,21 @@ def history(theatre: Path, path_text: str | None) -> str:
         }
         lines.append(json.dumps(entry, ensure_ascii=False) + "\n")
     return "".join(lines)
+
+
+def watch(
+    theatre: Path, display: str, announce: Callable[[str], None], report: Callable[[str], None]
+) -> str:
+    """Record hand edits as they happen, until SIGINT or SIGTERM (spec FR-100 to FR-106)."""
+    stop = threading.Event()
+    # The handlers only set a flag, so a reconcile in progress always finishes (research S-6).
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(signum, lambda *_: stop.set())
+
+    def sync() -> Loaded:
+        with theatre_lock(theatre):
+            loaded, _ = open_theatre(theatre, reconcile=True)
+        return loaded
+
+    run_watch(theatre, sync, lambda: announce(f"watching {display}\n"), stop, report)
+    return ""
