@@ -6,6 +6,7 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
+from troupe.config import view
 from troupe.config.edit.apply import apply_set
 from troupe.config.leaves import leaves
 from troupe.config.loader import Loaded, load
@@ -14,7 +15,13 @@ from troupe.config.paths import ConfigPath, dotted_is_within, is_index
 from troupe.config.scalars import format_scalar, parse_value
 from troupe.config.store import ConfigStore
 from troupe.config.sync import reconcile as reconcile_files
-from troupe.config.tree import Located, LocatedMapping, LocatedSequence, TextInclude
+from troupe.config.tree import (
+    Located,
+    LocatedMapping,
+    LocatedScalar,
+    LocatedSequence,
+    TextInclude,
+)
 from troupe.config.watch import run_watch
 from troupe.errors import PathError
 
@@ -96,6 +103,17 @@ def get(theatre: Path, path_text: str) -> str:
     if isinstance(node, (LocatedMapping, LocatedSequence)):
         raise PathError(use_show_hint(path, node))
     return format_scalar(node.value)
+
+
+def show(theatre: Path, path_text: str | None, *, sources: bool) -> str:
+    """Print a scalar like `get`, anything else as YAML (spec FR-210 to FR-234)."""
+    path = None if path_text is None else ConfigPath.parse(path_text)
+    with theatre_lock(theatre):
+        loaded, _ = open_theatre(theatre, reconcile=True)
+    node = loaded.root if path is None else resolve(loaded.root, path)
+    if not sources and isinstance(node, (LocatedScalar, TextInclude)):
+        return format_scalar(node.value)
+    return view.render(node, theatre, sources=sources)
 
 
 def set_value(theatre: Path, path_text: str, value_text: str) -> str:
