@@ -53,7 +53,16 @@ def test_read_only_lock_file_can_still_be_locked(tmp_path: Path) -> None:
         assert not lock_is_free(path)
 
 
-def test_missing_troupe_directory_names_the_lock_file(tmp_path: Path) -> None:
+def test_missing_troupe_directory_reports_the_missing_configuration(tmp_path: Path) -> None:
     with pytest.raises(LoadError) as error, theatre_lock(tmp_path):
         pass
-    assert str(tmp_path / ".troupe" / LOCK_FILENAME) in error.value.message
+    assert str(tmp_path / ".troupe" / "troupe.yml") in error.value.message
+    assert not (tmp_path / ".troupe").exists()
+
+
+def test_unopenable_lock_file_names_it(tmp_path: Path) -> None:
+    theatre = _theatre(tmp_path)
+    (theatre / ".troupe" / LOCK_FILENAME).mkdir()
+    with pytest.raises(LoadError) as error, theatre_lock(theatre):
+        pass
+    assert str(theatre / ".troupe" / LOCK_FILENAME) in error.value.message

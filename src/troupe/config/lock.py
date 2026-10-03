@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from troupe.config.files import TROUPE_DIR
+from troupe.config.files import TROUPE_DIR, find_config
 from troupe.config.store import STORE_FILENAME
 from troupe.errors import LoadError
 
@@ -24,6 +24,8 @@ LOCK_FILENAME = STORE_FILENAME + ".lock"
 @contextmanager
 def theatre_lock(theatre: Path) -> Iterator[None]:
     path = theatre / TROUPE_DIR / LOCK_FILENAME
+    if not path.parent.is_dir():
+        find_config(theatre)  # nothing to lock: report the missing configuration instead
     try:
         try:
             fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)

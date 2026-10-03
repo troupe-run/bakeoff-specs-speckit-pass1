@@ -1,4 +1,4 @@
-"""The `troupe config` subcommands: show, set, history."""
+"""The `troupe config` subcommands: show, set, history, watch."""
 
 import json
 from pathlib import Path
@@ -6,23 +6,29 @@ from pathlib import Path
 from troupe.config.edit.apply import apply_set
 from troupe.config.leaves import leaves
 from troupe.config.loader import Loaded, load
+from troupe.config.lock import theatre_lock
 from troupe.config.paths import ConfigPath, dotted_is_within, is_index
 from troupe.config.scalars import format_scalar, parse_value
 from troupe.config.store import ConfigStore
+from troupe.config.sync import reconcile as reconcile_files
 from troupe.config.tree import Located, LocatedMapping, LocatedSequence, TextInclude
 from troupe.errors import PathError
 
 
-def open_theatre(theatre: Path) -> tuple[Loaded, ConfigStore]:
-    """Load the configuration and import it on first use (spec D-2).
+def open_theatre(theatre: Path, *, reconcile: bool) -> tuple[Loaded, ConfigStore]:
+    """Load the configuration; import it on first use (step 1 D-2), else reconcile if asked.
 
-    The import stands even if the command then fails; importing is not reconciling, so a
-    theatre that was imported before is never imported again.
+    This is what every command does before its own work. Every command except `history`
+    reconciles, so hand edits made while nothing was running are recorded (step 2 FR-120,
+    superseding step 1 D-1); `history` reports only what has been recorded (FR-121). The import
+    or reconcile stands even if the command then fails. Call with `theatre_lock` held.
     """
     loaded = load(theatre)
     store = ConfigStore(theatre)
     if not store.is_imported():
         store.import_leaves(leaves(loaded.root))
+    elif reconcile:
+        reconcile_files(loaded, store)
     return loaded, store
 
 
@@ -72,7 +78,8 @@ def _parent(path: ConfigPath, depth: int) -> str:
 
 def show(theatre: Path, path_text: str) -> str:
     path = ConfigPath.parse(path_text)
-    loaded, _ = open_theatre(theatre)
+    with theatre_lock(theatre):
+        loaded, _ = open_theatre(theatre, reconcile=True)
     node = resolve(loaded.root, path)
     if isinstance(node, (LocatedMapping, LocatedSequence)):
         raise PathError(f"{path}: is {node_kind(node)}, not a scalar")
@@ -82,16 +89,20 @@ def show(theatre: Path, path_text: str) -> str:
 def set_value(theatre: Path, path_text: str, value_text: str) -> str:
     path = ConfigPath.parse(path_text)
     value = parse_value(value_text)
-    loaded, store = open_theatre(theatre)
-    events = apply_set(theatre, loaded, path, value, before_write=store.check_writable)
-    store.record(events)
+    # The lock spans load, write and record, so the write-back is recorded before `watch` can
+    # load it, and `watch` then finds nothing to record (spec FR-130).
+    with theatre_lock(theatre):
+        loaded, store = open_theatre(theatre, reconcile=True)
+        events = apply_set(theatre, loaded, path, value, before_write=store.check_writable)
+        store.record(events)
     return ""
 
 
 def history(theatre: Path, path_text: str | None) -> str:
     if path_text is not None:
         ConfigPath.parse(path_text)
-    _, store = open_theatre(theatre)
+    with theatre_lock(theatre):
+        _, store = open_theatre(theatre, reconcile=False)
     lines = []
     for record in store.history():
         if path_text is not None and not dotted_is_within(record.path, path_text):

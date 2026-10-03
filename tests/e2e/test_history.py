@@ -101,12 +101,17 @@ def test_filter_for_a_path_that_never_existed_prints_nothing(theatre: Theatre) -
     assert (result.code, result.out) == (0, "")
 
 
-def test_hand_edits_are_not_reconciled(theatre: Theatre) -> None:
+def test_history_does_not_reconcile_but_set_does(theatre: Theatre) -> None:
+    # Step 2 (FR-120, FR-121) supersedes step 1 D-1: hand edits are recorded by the next
+    # command that reconciles, never by `history`.
     _ready(theatre).history()
     theatre.write("troupe.yml", MAIN.replace("a: 1", "a: 5"))
     assert theatre.history() == IMPORTS
     set_ok(theatre, "a", "6")
-    assert theatre.history()[6:] == [{"seq": 7, "op": "set", "path": "a", "old": 5, "new": 6}]
+    assert theatre.history()[6:] == [
+        {"seq": 7, "op": "set", "path": "a", "old": 1, "new": 5},
+        {"seq": 8, "op": "set", "path": "a", "old": 5, "new": 6},
+    ]
 
 
 def test_seq_stays_contiguous_over_many_sets(theatre: Theatre) -> None:
