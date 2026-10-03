@@ -132,10 +132,10 @@ Single project: `src/troupe/`, `tests/` at the repository root (plan.md → Proj
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T018 [P] Update `README.md`: replace the `show PATH` line with `uv run troupe config get PATH [--theatre DIR]   # print a scalar setting` and `uv run troupe config show [PATH] [--sources] [--theatre DIR]   # print a setting or section as YAML (--sources: which file each value is in)`; add a short paragraph with a `show --sources` example; change the exit-5 row to "path not found, or the wrong kind of node for the command (e.g. `get` of a section)"; link `specs/003-config-get-show/`
-- [ ] T019 [P] Mark step 1's `show PATH` as superseded: in `specs/001-config-load-show-set/spec.md` FR-015 append "*(Replaced by step 3: this behaviour is now `get PATH`; see `specs/003-config-get-show/spec.md`.)*"; in `specs/001-config-load-show-set/contracts/cli.md` add a one-line note at the top that `show PATH` is now `get PATH` (step 3); in `specs/002-config-file-sync/contracts/cli.md` add `get` to the side-effects table (imports: yes, reconciles: yes)
-- [ ] T020 Walk through `specs/003-config-get-show/quickstart.md` by hand and confirm each expected output (including the read-back check)
-- [ ] T021 Run the full gates and show output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; report any failure with its output. Commit polish ("why": docs and earlier specs agree with the new commands, Principle VI)
+- [X] T018 [P] Update `README.md`: replace the `show PATH` line with `uv run troupe config get PATH [--theatre DIR]   # print a scalar setting` and `uv run troupe config show [PATH] [--sources] [--theatre DIR]   # print a setting or section as YAML (--sources: which file each value is in)`; add a short paragraph with a `show --sources` example; change the exit-5 row to "path not found, or the wrong kind of node for the command (e.g. `get` of a section)"; link `specs/003-config-get-show/`
+- [X] T019 [P] Mark step 1's `show PATH` as superseded: in `specs/001-config-load-show-set/spec.md` FR-015 append "*(Replaced by step 3: this behaviour is now `get PATH`; see `specs/003-config-get-show/spec.md`.)*"; in `specs/001-config-load-show-set/contracts/cli.md` add a one-line note at the top that `show PATH` is now `get PATH` (step 3); in `specs/002-config-file-sync/contracts/cli.md` add `get` to the side-effects table (imports: yes, reconciles: yes)
+- [X] T020 Walk through `specs/003-config-get-show/quickstart.md` by hand and confirm each expected output (including the read-back check)
+- [X] T021 Run the full gates and show output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; report any failure with its output. Commit polish ("why": docs and earlier specs agree with the new commands, Principle VI)
 
 ---
 

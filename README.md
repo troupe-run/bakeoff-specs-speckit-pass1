@@ -6,7 +6,8 @@ includes. This package provides `troupe config`, which reads and changes that co
 disturbing the hand-written files, and records every change as an event.
 
 ```sh
-uv run troupe config show PATH          [--theatre DIR]   # print a scalar setting
+uv run troupe config get PATH           [--theatre DIR]   # print a scalar setting
+uv run troupe config show [PATH] [--sources] [--theatre DIR]   # print a setting or a section as YAML
 uv run troupe config set PATH VALUE     [--theatre DIR]   # change it in the file that holds it
 uv run troupe config history [PATH]     [--theatre DIR]   # list changes as JSON Lines
 uv run troupe config watch              [--theatre DIR]   # record hand edits as they happen
@@ -15,6 +16,15 @@ uv run troupe config watch              [--theatre DIR]   # record hand edits as
 - `PATH` is dotted (`agents.coder.model`); a digit segment indexes a list (`tools.0`).
 - `VALUE` is one YAML 1.2 flow node: `0.2`, `true`, `null`, `abc`, `"0.2"`, `{a: 1}`, `[a, b]`,
   `"line one\nline two\n"`.
+- `show` prints a section (or, without `PATH`, the whole configuration) as YAML with every include
+  resolved — text includes as literal blocks. `--sources` adds `# from <file>` to each value, naming
+  the file it lives in, relative to the theatre:
+
+  ```sh
+  $ uv run troupe config show agents --sources
+  coder:
+    model: sonnet # from .troupe/agents/coder.yaml
+  ```
 - `set` changes only the bytes of the value: comments, quoting, indentation and layout elsewhere
   stay exactly as written. Every edit is re-read and checked before the file is replaced; if it
   cannot be written safely, nothing changes and the command exits 3.
@@ -31,7 +41,7 @@ uv run troupe config watch              [--theatre DIR]   # record hand edits as
 | 2 | usage error |
 | 3 | write refused (no file changed) |
 | 4 | configuration cannot be loaded |
-| 5 | path not found, or the wrong kind of node for the command |
+| 5 | path not found, or the wrong kind of node for the command (e.g. `get` of a section) |
 
 ## Development
 
@@ -44,4 +54,4 @@ uv run ruff check . && uv run ruff format --check .
 
 Specification, design decisions and task list: [`specs/001-config-load-show-set/`](specs/001-config-load-show-set/)
 (load, show, set, history) and [`specs/002-config-file-sync/`](specs/002-config-file-sync/) (sync with
-files, watch).
+files, watch) and [`specs/003-config-get-show/`](specs/003-config-get-show/) (get, show as YAML).

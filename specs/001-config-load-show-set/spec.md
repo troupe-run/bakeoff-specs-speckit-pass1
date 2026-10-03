@@ -185,6 +185,7 @@ then `config history` and `config history <path>`, and compare the JSON Lines ou
 
 - **FR-015**: `config show PATH` MUST print the scalar at PATH per FR-006 (a text include prints as
   its text). A mapping or list at PATH, or a missing PATH, MUST produce exit 5.
+  *(Replaced by step 3: this behaviour is now `get PATH`; see `specs/003-config-get-show/spec.md`.)*
 
 **set — where the change is written**
 

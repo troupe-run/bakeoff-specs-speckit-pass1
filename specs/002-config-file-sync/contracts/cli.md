@@ -34,7 +34,8 @@ the current directory (spec D-11).
 
 | Command | Imports a never-imported theatre | Reconciles first | Then |
 |---|---|---|---|
-| `show` | yes | yes | prints the value |
+| `get` (step 3) | yes | yes | prints the value |
+| `show` | yes | yes | prints the value (step 3: or a section as YAML) |
 | `set` | yes | yes | writes and records its own events |
 | `watch` | yes | yes, then within 2 s of each change | — |
 | `history` | yes | **no** | prints recorded events |

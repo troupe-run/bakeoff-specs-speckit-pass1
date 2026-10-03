@@ -1,5 +1,8 @@
 # CLI Contract: `troupe config` (Step 1)
 
+> Step 3: `show PATH` below is now `get PATH`; `show` prints sections as YAML — see
+> `specs/003-config-get-show/contracts/cli.md`.
+
 The product owner's contract (quoted in `spec.md` input) is normative; this file fixes the command
 surface the implementation exposes and the exact output shapes tests check.
 
