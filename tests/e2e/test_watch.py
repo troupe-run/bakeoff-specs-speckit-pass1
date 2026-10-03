@@ -129,3 +129,12 @@ def test_edits_made_before_watch_starts_are_reconciled_at_start(
     theatre.write("troupe.yml", "a: 2\n")
     start_watch()
     assert recorded(theatre)[1:] == [{"seq": 2, "op": "set", "path": "a", "old": 1, "new": 2}]
+
+
+def test_edit_in_an_include_of_an_include_is_recorded(theatre: Theatre, start_watch: Start) -> None:
+    theatre.write("agents/limits.yaml", "retries: 2\n")
+    theatre.write("agents/coder.yaml", "model: opus\nlimits: file:limits.yaml\n")
+    theatre.write("troupe.yml", "agents:\n  coder: file:agents/coder.yaml\n")
+    start_watch()
+    since = _edit(theatre, "agents/limits.yaml", "retries: 5\n")
+    wait_for_history(theatre, _has("set", "agents.coder.limits.retries", 2, 5), since)

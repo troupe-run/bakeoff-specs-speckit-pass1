@@ -161,3 +161,24 @@ def test_reconcile_changes_no_configuration_file(theatre: Theatre) -> None:
     before = theatre.snapshot()
     _show(theatre, "a")
     assert theatre.snapshot() == before
+
+
+def test_scalar_replaced_by_collections_by_hand(theatre: Theatre) -> None:
+    _imported(theatre, "m: plain\n")
+    theatre.write("troupe.yml", "m: {k: 1, j: [x]}\n")
+    _show(theatre, "m.k")
+    assert theatre.history()[1:] == [
+        {"seq": 2, "op": "set", "path": "m.k", "old": None, "new": 1},
+        {"seq": 3, "op": "set", "path": "m.j.0", "old": None, "new": "x"},
+        {"seq": 4, "op": "remove", "path": "m", "old": "plain", "new": None},
+    ]
+
+
+def test_collection_replaced_by_a_scalar_by_hand(theatre: Theatre) -> None:
+    _imported(theatre, "m: {k: 1}\n")
+    theatre.write("troupe.yml", "m: 3\n")
+    _show(theatre, "m")
+    assert theatre.history()[1:] == [
+        {"seq": 2, "op": "set", "path": "m", "old": None, "new": 3},
+        {"seq": 3, "op": "remove", "path": "m.k", "old": 1, "new": None},
+    ]

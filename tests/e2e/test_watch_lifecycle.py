@@ -117,3 +117,22 @@ def test_line_names_a_relative_theatre_as_given(
     theatre.write("troupe.yml", "a: 1\n")
     watcher = start_watch("--theatre", "theatre", theatre_arg=False, cwd=tmp_path)
     assert watcher.out == "watching theatre\n"
+
+
+def test_main_file_deleted_then_recreated(theatre: Theatre, start_watch: Start) -> None:
+    theatre.write("troupe.yml", "a: 1\n")
+    watcher = start_watch()
+    before = recorded(theatre)
+    (theatre.root / ".troupe" / "troupe.yml").unlink()
+    deadline = time.monotonic() + 2.0
+    while not _error_lines(watcher) and time.monotonic() < deadline:
+        time.sleep(0.02)
+    lines = _error_lines(watcher)
+    assert len(lines) == 1, watcher.err
+    assert "troupe.yml" in lines[0]
+    assert watcher.running()
+    assert recorded(theatre) == before
+    since = time.monotonic()
+    theatre.write("troupe.yml", "a: 2\n")
+    wait_for_history(theatre, lambda events: len(events) == 2, since)
+    assert recorded(theatre)[1:] == [{"seq": 2, "op": "set", "path": "a", "old": 1, "new": 2}]

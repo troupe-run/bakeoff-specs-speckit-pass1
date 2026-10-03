@@ -1,6 +1,7 @@
 """A `set` while `watch` runs records exactly its own events; every change is recorded once
 (spec US3, FR-130, FR-131)."""
 
+import signal
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -109,3 +110,18 @@ def test_watch_waits_for_the_theatre_lock(theatre: Theatre, start_watch: Start) 
     time.sleep(1.0)
     assert recorded(theatre) == events
     assert events[1] == {"seq": 2, "op": "set", "path": "a", "old": 1, "new": 2}
+
+
+def test_signal_during_a_reconcile_lets_it_finish(theatre: Theatre, start_watch: Start) -> None:
+    theatre.write("troupe.yml", "a: 1\n")
+    watcher = start_watch()
+    with theatre_lock(theatre.root):
+        theatre.write("troupe.yml", "a: 2\n")
+        time.sleep(0.5)  # watch has seen the change and is waiting for the lock to reconcile
+        watcher.process.send_signal(signal.SIGTERM)
+        time.sleep(0.5)
+        assert watcher.running()
+        assert len(recorded(theatre)) == 1
+    result = watcher.stop()
+    assert (result.code, result.out, result.err) == (0, f"watching {theatre.root}\n", "")
+    assert recorded(theatre)[1:] == [{"seq": 2, "op": "set", "path": "a", "old": 1, "new": 2}]
