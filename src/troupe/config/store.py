@@ -116,6 +116,11 @@ class ConfigStore:
         with self._guard():
             self._app.save(aggregate)
 
+    def leaves(self) -> dict[str, Scalar]:
+        """The projection: what reconcile compares the files against (spec D-10)."""
+        aggregate = self._get()
+        return {} if aggregate is None else dict(aggregate.leaves)
+
     def history(self) -> list[HistoryRecord]:
         aggregate = self._get()
         return [] if aggregate is None else list(aggregate.log)
