@@ -192,8 +192,8 @@ byte-for-byte with the expected annotated YAML.
   comment on its header line (D-23).
 - **Same file included twice** (two keys pointing to the same YAML file): both sections are shown in
   full, each annotated with that file.
-- **Include target reached through `..` or a symbolic link**: `<file>` is the path as written, made
-  relative to the theatre directory and lexically normalised (D-22); links are not resolved.
+- **Include target reached through `..` or a symbolic link**: `<file>` is the file's real location
+  made relative to the theatre directory's real location (D-22).
 - **Keys that need quoting** (e.g. a key `true` or `"a: b"`): quoted like string values.
 - **Floats** `inf`, `-inf`, `nan` inside a section: written `.inf`, `-.inf`, `.nan` so they read back
   as floats; as a scalar at PATH they print as `get` prints them (step 1 FR-006).
@@ -287,11 +287,14 @@ Recorded per Constitution Principles V and VI.
   FR-225). Reason: it matches the default indentation step 1 writes (FR-029), is the most common
   hand-written layout, and reads back as the same values (FR-214), so the output can be pasted into a
   configuration file. Empty collections use `{}` / `[]` because block style cannot express them.
-- **D-22 `<file>` for files outside the theatre directory.** "Relative to the theatre directory" is
-  taken literally: a file outside it is given with `..` segments (e.g. `../shared/x.yaml`). The path is
-  normalised lexically from the include strings as written; symbolic links are not resolved. Reason:
-  it names the file the user wrote in the include, and resolving links could name a file the user
-  never referred to.
+- **D-22 `<file>` for files outside the theatre directory, and symbolic links.** "Relative to the
+  theatre directory" is taken literally: a file outside it is given with `..` segments (e.g.
+  `../shared/x.yaml`). Both the file and the theatre directory are taken at their real locations
+  (symbolic links resolved) before the relative path is computed. Reason: the tool already identifies
+  every loaded file by its real location (that is how include cycles are detected, step 1 FR-012), so
+  `<file>` names the file that actually holds the value — the one a `set` would write — and a theatre
+  reached through a linked directory (e.g. `/tmp` on macOS) still gives `.troupe/troupe.yml`, not a
+  path full of `..`.
 - **D-23 `--sources` on a scalar.** The contract says `show` prints a scalar like `get`, and that
   `--sources` prints "the same YAML" annotated, but does not say what `--sources` does for a scalar.
   Chosen: the scalar is printed as YAML with the comment (e.g. `0.2 # from .troupe/troupe.yml`; a text
