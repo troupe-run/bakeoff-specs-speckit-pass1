@@ -182,3 +182,10 @@ Task: "E2E tests for watch lifecycle in tests/e2e/test_watch_lifecycle.py"  # T0
 - Every commit message says why the change was made (Principle VI).
 - `config history` never reconciles, so tests use it to observe what other processes recorded.
 - Concurrent `set`s and more than one `watch` are out of contract (spec D-16); do not test them.
+
+## Phase 7: Convergence
+
+- [ ] T028 CRITICAL: Add an e2e test in `tests/e2e/test_watch_lifecycle.py` that, while `watch` runs on `a: 1`, deletes `.troupe/troupe.yml` (expect one `troupe: error:` stderr line naming it within 2 s, nothing recorded, process alive), then recreates it as `a: 2` and expects `set a 1 → 2` within 2 s of the recreation per Constitution II / spec Edge Cases "File deleted and recreated" (partial)
+- [ ] T029 CRITICAL: Add an e2e test in `tests/e2e/test_watch_exactly_once.py` that holds `theatre_lock(theatre.root)` in the test process, edits `a: 1 → 2`, waits 0.5 s, sends SIGTERM to `watch`, waits 0.5 s, then releases the lock; assert `watch` exits 0 with stdout exactly `watching <dir>\n`, and the store holds either exactly the one `set a 1 → 2` event or none, never part of a reconcile (with a single-leaf edit, check it is exactly one event) per Constitution II / spec Edge Cases "Signal during a reconcile", FR-105, FR-115 (partial)
+- [ ] T030 CRITICAL: Add e2e tests in `tests/e2e/test_reconcile.py` for hand edits that change a node's kind: `m: plain` → `m: {k: 1, j: [x]}` followed by `config show m.k` records `set m.k` (null → 1) and `set m.j.0` (null → "x") then `remove m` ("plain" → null), in that order; and the reverse `m: {k: 1}` → `m: 3` records `set m` (null → 3) then `remove m.k` (1 → null) per Constitution II / spec Edge Cases "Scalar replaced by a collection by hand, or the reverse" (partial)
+- [ ] T031 Add a `watch` e2e test in `tests/e2e/test_watch.py` with a two-level include (`troupe.yml` → `agents/coder.yaml` → `agents/limits.yaml`): editing `limits.yaml` records the matching `set` within 2 s per SC-101 (partial)
