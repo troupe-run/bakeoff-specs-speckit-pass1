@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from troupe.config import commands
+from troupe.config.leaves import LeafEvent
 from troupe.config.lock import LOCK_FILENAME, theatre_lock
+from troupe.config.store import ConfigStore
 from troupe.errors import LoadError
 
 
@@ -66,3 +69,22 @@ def test_unopenable_lock_file_names_it(tmp_path: Path) -> None:
     with pytest.raises(LoadError) as error, theatre_lock(theatre):
         pass
     assert str(theatre / ".troupe" / LOCK_FILENAME) in error.value.message
+
+
+def test_set_records_its_events_with_the_lock_held(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    theatre = _theatre(tmp_path)
+    (theatre / ".troupe" / "troupe.yml").write_bytes(b"a: 1\n")
+    commands.history(theatre, None)  # import, so the set below records exactly its own event
+    held: list[bool] = []
+    original = ConfigStore.record
+
+    def record(self: ConfigStore, events: list[LeafEvent]) -> None:
+        held.append(not lock_is_free(theatre / ".troupe" / LOCK_FILENAME))
+        original(self, events)
+
+    monkeypatch.setattr(ConfigStore, "record", record)
+    commands.set_value(theatre, "a", "2")
+    assert held and all(held)
+    assert (theatre / ".troupe" / "troupe.yml").read_bytes() == b"a: 2\n"
