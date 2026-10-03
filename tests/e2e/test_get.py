@@ -1,4 +1,4 @@
-"""`show PATH` prints a scalar from the main file, YAML includes and text includes."""
+"""`get PATH` prints a scalar exactly as step 1's `show` did (spec FR-201, SC-201)."""
 
 import pytest
 
@@ -61,8 +61,8 @@ def ready(theatre: Theatre) -> Theatre:
         ("prompt", "Be terse.\n"),
     ],
 )
-def test_show_prints_the_scalar(ready: Theatre, path: str, printed: str) -> None:
-    result = ready.config("show", path)
+def test_get_prints_the_scalar(ready: Theatre, path: str, printed: str) -> None:
+    result = ready.config("get", path)
     assert (result.code, result.out, result.err) == (0, printed, "")
 
 
@@ -70,33 +70,33 @@ def test_nested_include_path_is_relative_to_the_including_file(theatre: Theatre)
     theatre.write("troupe.yml", "a: file:sub/one.yaml\n")
     theatre.write("sub/one.yaml", "b: file:two.yaml\n")
     theatre.write("sub/two.yaml", "c: deep\n")
-    assert theatre.config("show", "a.b.c").out == "deep\n"
+    assert theatre.config("get", "a.b.c").out == "deep\n"
 
 
 def test_text_include_prints_exact_bytes_including_crlf(theatre: Theatre) -> None:
     theatre.write("troupe.yml", "prompt: file:p.txt\n")
     theatre.write("p.txt", b"one\r\ntwo\r\n")
-    result = theatre.run("config", "show", "prompt")
+    result = theatre.run("config", "get", "prompt")
     assert result.out == "one\r\ntwo\r\n"
 
 
 def test_text_include_without_final_newline_gets_one(theatre: Theatre) -> None:
     theatre.write("troupe.yml", "prompt: file:p.txt\n")
     theatre.write("p.txt", "no newline")
-    assert theatre.config("show", "prompt").out == "no newline\n"
+    assert theatre.config("get", "prompt").out == "no newline\n"
 
 
 def test_empty_text_include_prints_a_newline(theatre: Theatre) -> None:
     theatre.write("troupe.yml", "prompt: 'file:p.txt'\n")
     theatre.write("p.txt", "")
-    assert theatre.config("show", "prompt").out == "\n"
+    assert theatre.config("get", "prompt").out == "\n"
 
 
 def test_non_ascii_values_print_as_utf8(theatre: Theatre) -> None:
     theatre.write("troupe.yml", "name: 日本語 ✓\n")
-    assert theatre.config("show", "name").out == "日本語 ✓\n"
+    assert theatre.config("get", "name").out == "日本語 ✓\n"
 
 
 def test_crlf_config_file(theatre: Theatre) -> None:
     theatre.write("troupe.yml", b"a:\r\n  b: x\r\n")
-    assert theatre.config("show", "a.b").out == "x\n"
+    assert theatre.config("get", "a.b").out == "x\n"

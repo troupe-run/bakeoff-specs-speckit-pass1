@@ -1,4 +1,4 @@
-"""`show` of a missing path or a collection → exit 5 naming the path."""
+"""`get`: a missing path → exit 5 naming it; a collection → exit 5 pointing to `config show`."""
 
 import pytest
 
@@ -26,7 +26,16 @@ def ready(theatre: Theatre) -> Theatre:
         "prompt.x",  # below a text include
     ],
 )
-def test_show_exits_5_naming_the_path(ready: Theatre, path: str) -> None:
+def test_get_exits_5_naming_the_path(ready: Theatre, path: str) -> None:
     before = ready.snapshot()
-    assert_failed(ready.config("show", path), 5, path)
+    assert_failed(ready.config("get", path), 5, path)
     assert ready.snapshot() == before
+
+
+@pytest.mark.parametrize("path", ["model", "tools", "agents.coder"])
+def test_get_of_a_collection_mentions_config_show(ready: Theatre, path: str) -> None:
+    ready.write("troupe.yml", ready.read("troupe.yml") + "agents:\n  coder: file:c.yaml\n")
+    ready.write("c.yaml", "model: x\n")
+    result = ready.config("get", path)
+    assert_failed(result, 5, path)
+    assert "config show" in result.err, result

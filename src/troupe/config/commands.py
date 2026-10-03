@@ -1,4 +1,4 @@
-"""The `troupe config` subcommands: show, set, history, watch."""
+"""The `troupe config` subcommands: get, show, set, history, watch."""
 
 import json
 import signal
@@ -80,13 +80,21 @@ def _parent(path: ConfigPath, depth: int) -> str:
     return ConfigPath(path.segments[:depth]).dotted if depth else "the top level"
 
 
-def show(theatre: Path, path_text: str) -> str:
+def use_show_hint(path: ConfigPath, node: Located) -> str:
+    """`get` refuses a mapping or list and points to `show`, which prints it (spec FR-202)."""
+    return (
+        f"{path}: is {node_kind(node)}, not a scalar; use `troupe config show {path}` to print it"
+    )
+
+
+def get(theatre: Path, path_text: str) -> str:
+    """Print the scalar at PATH, as step 1's `show` did (spec FR-200 to FR-204)."""
     path = ConfigPath.parse(path_text)
     with theatre_lock(theatre):
         loaded, _ = open_theatre(theatre, reconcile=True)
     node = resolve(loaded.root, path)
     if isinstance(node, (LocatedMapping, LocatedSequence)):
-        raise PathError(f"{path}: is {node_kind(node)}, not a scalar")
+        raise PathError(use_show_hint(path, node))
     return format_scalar(node.value)
 
 

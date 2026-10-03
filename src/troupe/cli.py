@@ -1,4 +1,4 @@
-"""Command-line entry point: `troupe config show|set|history`."""
+"""Command-line entry point: `troupe config get|show|set|history|watch`."""
 
 import argparse
 import os
@@ -28,6 +28,7 @@ def _parser() -> argparse.ArgumentParser:
         )
         return sub
 
+    add("get", "print a setting's value").add_argument("path", metavar="PATH")
     add("show", "print a setting's value").add_argument("path", metavar="PATH")
     set_parser = add("set", "change a setting and write it back to its file")
     set_parser.add_argument("path", metavar="PATH")
@@ -64,8 +65,8 @@ def run(argv: Sequence[str]) -> str:
     theatre = Path(args.theatre or os.environ.get(THEATRE_ENV) or ".")
     if args.subcommand == "watch":
         return commands.watch(theatre, theatre_display(args.theatre), _announce, _report)
-    if args.subcommand == "show":
-        return commands.show(theatre, args.path)
+    if args.subcommand in ("get", "show"):
+        return commands.get(theatre, args.path)
     if args.subcommand == "set":
         return commands.set_value(theatre, args.path, args.value)
     return commands.history(theatre, args.path)

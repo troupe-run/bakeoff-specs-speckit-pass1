@@ -19,7 +19,10 @@ def ready(theatre: Theatre) -> Theatre:
         (),
         ("config",),
         ("config", "frobnicate"),
-        ("config", "show"),
+        ("config", "get"),
+        ("config", "get", "a", "extra"),
+        ("config", "get", "a", "--sources"),
+        ("config", "get", "a", "--bogus"),
         ("config", "set", "a"),
         ("config", "show", "a", "extra"),
         ("config", "show", "a", "--bogus"),
@@ -40,16 +43,16 @@ def test_invalid_value_exits_2_naming_the_value(ready: Theatre) -> None:
 
 @pytest.mark.parametrize("path", ["a..b", ".a", "a."])
 def test_empty_path_segment_exits_2_naming_the_path(ready: Theatre, path: str) -> None:
-    assert_failed(ready.config("show", path), 2, path)
+    assert_failed(ready.config("get", path), 2, path)
 
 
 def test_theatre_option_before_positionals(ready: Theatre) -> None:
-    result = ready.run("config", "show", "--theatre", str(ready.root), "a", theatre=False)
+    result = ready.run("config", "get", "--theatre", str(ready.root), "a", theatre=False)
     assert (result.code, result.out) == (0, "1\n")
 
 
 def test_theatre_defaults_to_current_directory(ready: Theatre) -> None:
-    result = ready.run("config", "show", "a", theatre=False, cwd=ready.root)
+    result = ready.run("config", "get", "a", theatre=False, cwd=ready.root)
     assert (result.code, result.out) == (0, "1\n")
 
 
@@ -57,11 +60,11 @@ def test_theatre_defaults_to_environment_variable(ready: Theatre, tmp_path: Path
     other = Theatre(tmp_path / "other")
     other.write("troupe.yml", "a: 2\n")
     env = {"TROUPE_THEATRE": str(ready.root)}
-    result = ready.run("config", "show", "a", theatre=False, cwd=other.root, env=env)
+    result = ready.run("config", "get", "a", theatre=False, cwd=other.root, env=env)
     assert (result.code, result.out) == (0, "1\n")
-    result = ready.run("config", "show", "a", "--theatre", str(other.root), theatre=False, env=env)
+    result = ready.run("config", "get", "a", "--theatre", str(other.root), theatre=False, env=env)
     assert (result.code, result.out) == (0, "2\n")
-    result = ready.run("config", "show", "a", theatre=False, env={"TROUPE_THEATRE": ""})
+    result = ready.run("config", "get", "a", theatre=False, env={"TROUPE_THEATRE": ""})
     assert (result.code, result.out) == (0, "1\n")
 
 

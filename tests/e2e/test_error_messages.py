@@ -14,7 +14,7 @@ FILES = {
 @pytest.mark.parametrize(
     ("args", "code", "mention"),
     [
-        (("show", "l"), 5, "l"),
+        (("get", "l"), 5, "l"),
         (("show", "a.b"), 5, "a.b"),
         (("show", "missing"), 5, "missing"),
         (("set", "l.5", "x"), 5, "l.5"),
@@ -22,7 +22,7 @@ FILES = {
         (("set", "txt", "[1]"), 3, "txt"),
         (("set", "f", '" x"'), 3, "f"),
         (("set", "a", "[oops"), 2, "[oops"),
-        (("show", "a..b"), 2, "a..b"),
+        (("get", "a..b"), 2, "a..b"),
         (("history", "a..b"), 2, "a..b"),
     ],
 )
