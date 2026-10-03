@@ -1,4 +1,4 @@
-"""Reconcile (spec FR-110 – FR-116): files compared with the projection, one event per leaf."""
+"""Reconcile (spec FR-110 to FR-116): files compared with the projection, one event per leaf."""
 
 from pathlib import Path
 
@@ -76,7 +76,7 @@ ORIGINAL = "a: x\nb: [x, y]\nc:\n  d: 1\n"
     [
         "# a comment\na: x   # another\nb: [x, y]\nc:\n  d: 1\n",
         "a: x\nb: [ x,   y ]\nc:\n    d: 1\n",
-        'a: "x"\nb: [\'x\', y]\nc:\n  d: 1\n',
+        "a: \"x\"\nb: ['x', y]\nc:\n  d: 1\n",
         "\na: x\n\nb: [x, y]\n\nc:\n  d: 1\n\n",
         "c:\n  d: 1\nb: [x, y]\na: x\n",
         "a: x\r\nb: [x, y]\r\nc:\r\n  d: 1\r\n",

@@ -1,4 +1,4 @@
-"""Reconcile: compare the files with the recorded configuration (spec FR-110 – FR-116)."""
+"""Reconcile: compare the files with the recorded configuration (spec FR-110 to FR-116)."""
 
 from troupe.config.leaves import LeafEvent, diff_events, leaves
 from troupe.config.loader import Loaded
