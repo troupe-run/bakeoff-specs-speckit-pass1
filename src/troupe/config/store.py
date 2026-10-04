@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 from eventsourcing.application import AggregateNotFoundError, Application
@@ -14,6 +15,7 @@ from eventsourcing.persistence import PersistenceError
 
 from troupe.config.files import TROUPE_DIR
 from troupe.config.leaves import LeafEvent, Op
+from troupe.config.lineage import Actor, ActorKind, Lineage, Via
 from troupe.config.scalars import Scalar
 from troupe.errors import LoadError, WriteRefused
 
@@ -28,6 +30,7 @@ class HistoryRecord:
     path: str
     old: Scalar
     new: Scalar
+    lineage: Lineage
 
 
 class TheatreConfig(Aggregate):
@@ -41,13 +44,44 @@ class TheatreConfig(Aggregate):
         self.leaves: dict[str, Scalar] = {}
         self.log: list[HistoryRecord] = []
 
+    # The lineage arguments are stored in each event and replayed with it, so lineage survives
+    # restarts and never changes once recorded (spec FR-306, research L-1). They have no
+    # defaults: stores recorded before step 4 are out of contract (research L-8).
     @event("LeafChanged")
-    def change(self, op: Op, path: str, old: Scalar, new: Scalar) -> None:
+    def change(
+        self,
+        op: Op,
+        path: str,
+        old: Scalar,
+        new: Scalar,
+        actor_kind: str,
+        actor_id: str | None,
+        via: str,
+        at: str,
+        reason: str | None,
+        change: str,
+    ) -> None:
         if op == "remove":
             self.leaves.pop(path, None)
         else:
             self.leaves[path] = new
-        self.log.append(HistoryRecord(len(self.log) + 1, op, path, old, new))
+        actor = Actor(cast(ActorKind, actor_kind), actor_id)
+        lineage = Lineage(actor, cast(Via, via), at, reason, change)
+        self.log.append(HistoryRecord(len(self.log) + 1, op, path, old, new, lineage))
+
+    def apply(self, item: LeafEvent, lineage: Lineage) -> None:
+        self.change(
+            item.op,
+            item.path,
+            item.old,
+            item.new,
+            lineage.actor.kind,
+            lineage.actor.id,
+            lineage.via,
+            lineage.at,
+            lineage.reason,
+            lineage.change,
+        )
 
 
 class _ConfigApplication(Application[UUID]):
@@ -99,20 +133,23 @@ class ConfigStore:
     def is_imported(self) -> bool:
         return self._get() is not None
 
-    def import_leaves(self, leaves: dict[str, Scalar]) -> None:
+    def import_leaves(self, leaves: dict[str, Scalar], lineage: Lineage) -> None:
+        """Record the import, every event stamped with the one `lineage` (FR-305)."""
         aggregate = TheatreConfig()
         for path, value in leaves.items():
-            aggregate.change("import", path, None, value)
+            aggregate.apply(LeafEvent("import", path, None, value), lineage)
         with self._guard():
             self._app.save(aggregate)
 
-    def record(self, events: list[LeafEvent]) -> None:
+    def record(self, events: list[LeafEvent], lineage: Lineage) -> None:
+        """Record one unit, every event stamped with the one `lineage` (FR-303, FR-305); a unit
+        with no events leaves no trace."""
         if not events:
             return
         aggregate = self._get()
         assert aggregate is not None, "record() before import"
         for item in events:
-            aggregate.change(item.op, item.path, item.old, item.new)
+            aggregate.apply(item, lineage)
         with self._guard():
             self._app.save(aggregate)
 

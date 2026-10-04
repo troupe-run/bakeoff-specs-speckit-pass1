@@ -9,6 +9,7 @@ from pathlib import Path
 from troupe.config import view
 from troupe.config.edit.apply import apply_set
 from troupe.config.leaves import leaves
+from troupe.config.lineage import UNKNOWN_ACTOR, Actor, Lineage
 from troupe.config.loader import Loaded, load
 from troupe.config.lock import theatre_lock
 from troupe.config.paths import ConfigPath, dotted_is_within, is_index
@@ -37,7 +38,7 @@ def open_theatre(theatre: Path, *, reconcile: bool) -> tuple[Loaded, ConfigStore
     loaded = load(theatre)
     store = ConfigStore(theatre)
     if not store.is_imported():
-        store.import_leaves(leaves(loaded.root))
+        store.import_leaves(leaves(loaded.root), Lineage.begin(UNKNOWN_ACTOR, "import"))
     elif reconcile:
         reconcile_files(loaded, store)
     return loaded, store
@@ -116,7 +117,9 @@ def show(theatre: Path, path_text: str | None, *, sources: bool) -> str:
     return view.render(node, theatre, sources=sources)
 
 
-def set_value(theatre: Path, path_text: str, value_text: str) -> str:
+def set_value(
+    theatre: Path, path_text: str, value_text: str, actor: Actor, reason: str | None
+) -> str:
     path = ConfigPath.parse(path_text)
     value = parse_value(value_text)
     # The lock spans load, write and record, so the write-back is recorded before `watch` can
@@ -124,7 +127,9 @@ def set_value(theatre: Path, path_text: str, value_text: str) -> str:
     with theatre_lock(theatre):
         loaded, store = open_theatre(theatre, reconcile=True)
         events = apply_set(theatre, loaded, path, value, before_write=store.check_writable)
-        store.record(events)
+        # Begun after open_theatre, so any import or reconcile above is a unit of its own with
+        # its own change and at, and is never credited to this command's actor (spec D-30).
+        store.record(events, Lineage.begin(actor, "cli", reason))
     return ""
 
 
@@ -143,6 +148,12 @@ def history(theatre: Path, path_text: str | None) -> str:
             "path": record.path,
             "old": record.old,
             "new": record.new,
+            # Lineage fields follow step 1's, in the contract's order (spec FR-300, D-38).
+            "actor": {"kind": record.lineage.actor.kind, "id": record.lineage.actor.id},
+            "via": record.lineage.via,
+            "at": record.lineage.at,
+            "reason": record.lineage.reason,
+            "change": record.lineage.change,
         }
         lines.append(json.dumps(entry, ensure_ascii=False) + "\n")
     return "".join(lines)

@@ -17,6 +17,25 @@ import pytest
 from troupe.config.store import STORE_FILENAME, ConfigStore
 
 TROUPE = shutil.which("troupe")
+# Inherited variables that would let the developer's shell decide a test's outcome.
+INHERITED_ENV_DROPPED = ("TROUPE_THEATRE", "TROUPE_ACTOR")
+# The login name every test runs under, unless it overrides LOGNAME (`getpass.getuser()` reads
+# LOGNAME first; research L-6).
+TEST_LOGIN = "troupe-tester"
+
+# The fields of a history line from step 1; step 4 adds lineage after them.
+CORE_FIELDS = ("seq", "op", "path", "old", "new")
+
+
+def base_env(drop: tuple[str, ...] = ()) -> dict[str, str]:
+    """The environment for a child `troupe` process, before a test's own additions."""
+    dropped = (*INHERITED_ENV_DROPPED, *drop)
+    environ = {k: v for k, v in os.environ.items() if k not in dropped}
+    if "LOGNAME" not in drop:
+        environ["LOGNAME"] = TEST_LOGIN
+    return environ
+
+
 COMMAND = [TROUPE] if TROUPE else [sys.executable, "-m", "troupe"]
 
 
@@ -49,11 +68,12 @@ class Theatre:
         theatre: bool = True,
         cwd: Path | None = None,
         env: dict[str, str] | None = None,
+        drop: tuple[str, ...] = (),
     ) -> "Result":
         argv = [*COMMAND, *args]
         if theatre:
             argv += ["--theatre", str(self.root)]
-        environ = {k: v for k, v in os.environ.items() if k != "TROUPE_THEATRE"} | (env or {})
+        environ = base_env(drop) | (env or {})
         done = subprocess.run(
             argv, capture_output=True, cwd=cwd or self.root, env=environ, check=False
         )
@@ -63,7 +83,14 @@ class Theatre:
         return self.run("config", *args)
 
     def history(self, path: str | None = None) -> list[dict[str, Any]]:
-        result = self.config("history", *([path] if path else []))
+        """Step 1's fields only; lineage is checked by `Theatre.events()`."""
+        return [{k: e[k] for k in CORE_FIELDS} for e in self.events(path)]
+
+    def events(
+        self, path: str | None = None, env: dict[str, str] | None = None
+    ) -> list[dict[str, Any]]:
+        """The full `config history` lines, lineage included."""
+        result = self.run("config", "history", *([path] if path else []), env=env)
         assert result.code == 0, result.err
         return [json.loads(line) for line in result.out.splitlines()]
 
@@ -175,7 +202,7 @@ def start_watch(theatre: Theatre) -> Iterator[Callable[..., Watcher]]:
         argv = [*COMMAND, "config", "watch", *extra]
         if theatre_arg:
             argv += ["--theatre", str(theatre.root)]
-        environ = {k: v for k, v in os.environ.items() if k != "TROUPE_THEATRE"} | (env or {})
+        environ = base_env() | (env or {})
         watcher = Watcher(argv, cwd or theatre.root, environ)
         started.append(watcher)
         watcher.first_line()

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from troupe.config.leaves import LeafEvent, leaves
+from troupe.config.lineage import UNKNOWN_ACTOR, Lineage
 from troupe.config.loader import load
 from troupe.config.store import ConfigStore
 from troupe.config.sync import reconcile
@@ -23,7 +24,9 @@ def _write(theatre: Path, text: str | bytes, name: str = "troupe.yml") -> None:
 
 def _imported(tmp_path: Path, text: str) -> Path:
     theatre = _theatre(tmp_path, text)
-    ConfigStore(theatre).import_leaves(leaves(load(theatre).root))
+    ConfigStore(theatre).import_leaves(
+        leaves(load(theatre).root), Lineage.begin(UNKNOWN_ACTOR, "import")
+    )
     return theatre
 
 
@@ -115,3 +118,21 @@ def test_reconcile_events_are_persisted(tmp_path: Path) -> None:
         (2, "set", "a", 1, 2),
     ]
     assert ConfigStore(theatre).leaves() == {"a": 2}
+
+
+def test_reconcile_stamps_one_file_lineage(tmp_path: Path) -> None:
+    theatre = _imported(tmp_path, "a: 1\nb: 2\n")
+    _write(theatre, "a: 10\nb: 20\n")
+    _reconcile(theatre)
+    imported, first, second = (r.lineage for r in ConfigStore(theatre).history()[1:])
+    assert first == second
+    assert (first.via, first.actor, first.reason) == ("file", UNKNOWN_ACTOR, None)
+    assert first.change != imported.change
+
+
+def test_empty_reconcile_records_nothing(tmp_path: Path) -> None:
+    theatre = _imported(tmp_path, "a: 1\n")
+    _write(theatre, "a: 2\n")
+    _reconcile(theatre)
+    assert _reconcile(theatre) == []
+    assert len(ConfigStore(theatre).history()) == 2

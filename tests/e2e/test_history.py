@@ -32,7 +32,27 @@ def test_output_is_json_lines_with_keys_in_order(theatre: Theatre) -> None:
     result = _ready(theatre).config("history")
     lines = result.out.splitlines()
     assert result.out.endswith("\n") and len(lines) == 6
-    assert list(json.loads(lines[0])) == ["seq", "op", "path", "old", "new"]
+    assert list(json.loads(lines[0]))[:5] == ["seq", "op", "path", "old", "new"]
+
+
+def test_history_line_keys_in_contract_order(theatre: Theatre) -> None:
+    set_ok(_ready(theatre), "a", "2")
+    lines = [json.loads(line) for line in theatre.config("history").out.splitlines()]
+    assert {line["op"] for line in lines} == {"import", "set"}
+    for line in lines:
+        assert list(line) == [
+            "seq",
+            "op",
+            "path",
+            "old",
+            "new",
+            "actor",
+            "via",
+            "at",
+            "reason",
+            "change",
+        ]
+        assert list(line["actor"]) == ["kind", "id"]
 
 
 def test_history_does_not_import_twice(theatre: Theatre) -> None:
@@ -124,8 +144,9 @@ def test_seq_stays_contiguous_over_many_sets(theatre: Theatre) -> None:
 
 def test_non_ascii_strings_are_written_literally(theatre: Theatre) -> None:
     theatre.write("troupe.yml", "name: café 🎭\n")
-    assert theatre.config("history").out == (
-        '{"seq": 1, "op": "import", "path": "name", "old": null, "new": "café 🎭"}\n'
+    out = theatre.config("history").out
+    assert out.startswith(
+        '{"seq": 1, "op": "import", "path": "name", "old": null, "new": "café 🎭", "actor": '
     )
 
 

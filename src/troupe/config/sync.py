@@ -1,6 +1,7 @@
 """Reconcile: compare the files with the recorded configuration (spec FR-110 to FR-116)."""
 
 from troupe.config.leaves import LeafEvent, diff_events, leaves
+from troupe.config.lineage import UNKNOWN_ACTOR, Lineage
 from troupe.config.loader import Loaded
 from troupe.config.store import ConfigStore
 
@@ -11,7 +12,8 @@ def reconcile(loaded: Loaded, store: ConfigStore) -> list[LeafEvent]:
     Leaves are compared type-exactly, so formatting- and comment-only edits record nothing. Sets
     come in file order, removes in projection order (research S-1). The events are saved in one
     go, so they are recorded all together or not at all; no difference records nothing.
+    File-originated events have the unknown actor and via `file` (FR-302, FR-310).
     """
     events = diff_events(store.leaves(), leaves(loaded.root))
-    store.record(events)
+    store.record(events, Lineage.begin(UNKNOWN_ACTOR, "file"))
     return events

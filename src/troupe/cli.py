@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from troupe.config import commands
+from troupe.config.lineage import actor_from_env
 from troupe.errors import TroupeError
 
 PROG = "troupe"
@@ -64,6 +65,9 @@ def _report(message: str) -> None:
 def run(argv: Sequence[str]) -> str:
     """Run a command and return its stdout; raises TroupeError on failure."""
     args = _parser().parse_args(argv)
+    # Every subcommand checks TROUPE_ACTOR before the theatre is touched, so an invalid actor
+    # imports, reconciles and writes nothing (spec FR-322, FR-323, D-31; research L-5).
+    actor = actor_from_env(os.environ)
     theatre = Path(args.theatre or os.environ.get(THEATRE_ENV) or ".")
     if args.subcommand == "watch":
         return commands.watch(theatre, theatre_display(args.theatre), _announce, _report)
@@ -72,7 +76,7 @@ def run(argv: Sequence[str]) -> str:
     if args.subcommand == "show":
         return commands.show(theatre, args.path, sources=args.sources)
     if args.subcommand == "set":
-        return commands.set_value(theatre, args.path, args.value)
+        return commands.set_value(theatre, args.path, args.value, actor=actor, reason=None)
     return commands.history(theatre, args.path)
 
 

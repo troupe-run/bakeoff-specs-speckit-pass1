@@ -23,9 +23,7 @@ def test_show_picks_up_a_hand_edit_and_records_it(theatre: Theatre) -> None:
     _imported(theatre, "a: 1\n")
     theatre.write("troupe.yml", "a: 2\n")
     assert _show(theatre, "a") == "2\n"
-    assert theatre.config("history").out.splitlines()[-1] == (
-        '{"seq": 2, "op": "set", "path": "a", "old": 1, "new": 2}'
-    )
+    assert theatre.history()[-1] == {"seq": 2, "op": "set", "path": "a", "old": 1, "new": 2}
 
 
 @pytest.mark.parametrize(

@@ -8,6 +8,7 @@ import pytest
 
 from troupe.config import commands
 from troupe.config.leaves import LeafEvent
+from troupe.config.lineage import Actor, Lineage
 from troupe.config.lock import LOCK_FILENAME, theatre_lock
 from troupe.config.store import ConfigStore
 from troupe.errors import LoadError
@@ -80,11 +81,11 @@ def test_set_records_its_events_with_the_lock_held(
     held: list[bool] = []
     original = ConfigStore.record
 
-    def record(self: ConfigStore, events: list[LeafEvent]) -> None:
+    def record(self: ConfigStore, events: list[LeafEvent], lineage: Lineage) -> None:
         held.append(not lock_is_free(theatre / ".troupe" / LOCK_FILENAME))
-        original(self, events)
+        original(self, events, lineage)
 
     monkeypatch.setattr(ConfigStore, "record", record)
-    commands.set_value(theatre, "a", "2")
+    commands.set_value(theatre, "a", "2", Actor("human", "t"), None)
     assert held and all(held)
     assert (theatre / ".troupe" / "troupe.yml").read_bytes() == b"a: 2\n"
