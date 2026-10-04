@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from tests.conftest import Theatre, assert_failed
+from troupe.config.store import STORE_FILENAME
 
 
 @pytest.fixture
@@ -26,13 +27,21 @@ def ready(theatre: Theatre) -> Theatre:
         ("config", "set", "a"),
         ("config", "show", "a", "extra"),
         ("config", "show", "a", "--bogus"),
+        ("config", "set", "a", "2", "--reason"),
+        ("config", "get", "a", "--reason", "x"),
+        ("config", "show", "--reason", "x"),
+        ("config", "history", "--reason", "x"),
+        ("config", "watch", "--reason", "x"),
     ],
 )
 def test_bad_command_lines_exit_2(ready: Theatre, args: tuple[str, ...]) -> None:
+    before = ready.snapshot()
     result = ready.run(*args)
     assert result.code == 2, result
     assert result.out == ""
     assert result.err != ""
+    assert ready.snapshot() == before
+    assert not (ready.root / ".troupe" / STORE_FILENAME).exists()
 
 
 def test_invalid_value_exits_2_naming_the_value(ready: Theatre) -> None:

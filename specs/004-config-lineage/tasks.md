@@ -156,7 +156,7 @@ scenarios 1–6).
 
 ### Tests for User Story 3
 
-- [ ] T017 [P] [US3] Create `tests/e2e/test_lineage_when_why.py` (use `theatre.events()`):
+- [X] T017 [P] [US3] Create `tests/e2e/test_lineage_when_why.py` (use `theatre.events()`):
   - `test_reason_is_recorded_on_the_sets_events`: `set a 2 --reason "raise for load test"` → `reason == "raise for load test"` (US3-1);
   - `test_reason_is_null_without_reason_and_on_import_and_file_events`: `set a 3` → `reason is None`; every `import` and `file` line in the history has `reason is None` (US3-2, FR-304);
   - `test_reason_applies_to_every_event_of_the_set`: `set b '[z]' --reason trim` replacing `[x, y]` → both lines `reason == "trim"` (US3-3);
@@ -165,11 +165,11 @@ scenarios 1–6).
   - `test_at_is_rfc3339_utc_within_the_command`: for an import (`history`), a reconcile (`get` after a hand edit) and a `set`, take `datetime.now(UTC)` before and after each command; the event's `at` ends with `Z`, parses with `datetime.strptime(at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC)`, and lies within `[before, after]` (US3-5, FR-303);
   - `test_at_is_shared_within_a_unit`: the two lines of `set b '[z]'` and the three import lines each have one `at` (FR-303, D-35);
   - `test_at_is_utc_whatever_the_time_zone`: run `set` with `env={"TZ": "America/New_York"}` → `at` still within the UTC bounds (spec edge case "non-UTC time zone")
-- [ ] T018 [P] [US3] In `tests/e2e/test_usage.py` add exit-2 cases that record nothing and change no file: `("config", "set", "a", "2", "--reason")` (no TEXT, FR-330), `("config", "get", "a", "--reason", "x")`, `("config", "show", "--reason", "x")`, `("config", "history", "--reason", "x")`, `("config", "watch", "--reason", "x")` (FR-332)
+- [X] T018 [P] [US3] In `tests/e2e/test_usage.py` add exit-2 cases that record nothing and change no file: `("config", "set", "a", "2", "--reason")` (no TEXT, FR-330), `("config", "get", "a", "--reason", "x")`, `("config", "show", "--reason", "x")`, `("config", "history", "--reason", "x")`, `("config", "watch", "--reason", "x")` (FR-332)
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] In `src/troupe/cli.py` add `set_parser.add_argument("--reason", metavar="TEXT", default=None, help="why the change is made (recorded in history)")` and pass `reason=args.reason` to `commands.set_value` (replacing T007's `None`). Run T017 – T018 to green; deliberately (a) pass the reason to the reconcile lineage too and confirm `…reconcile_in_the_same_command` fails; (b) use `datetime.now()` (local time) in `Lineage.begin` and confirm the `TZ` test fails; (c) map `""` to `None` and confirm the `""` case fails; restore. Commit ("why": auditors can see when each change was made and the reason given for it)
+- [X] T019 [US3] In `src/troupe/cli.py` add `set_parser.add_argument("--reason", metavar="TEXT", default=None, help="why the change is made (recorded in history)")` and pass `reason=args.reason` to `commands.set_value` (replacing T007's `None`). Run T017 – T018 to green; deliberately (a) pass the reason to the reconcile lineage too and confirm `…reconcile_in_the_same_command` fails; (b) use `datetime.now()` (local time) in `Lineage.begin` and confirm the `TZ` test fails; (c) map `""` to `None` and confirm the `""` case fails; restore. Commit ("why": auditors can see when each change was made and the reason given for it)
 
 **Checkpoint**: when and why are answered for every event.
 

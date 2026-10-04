@@ -36,6 +36,9 @@ def _parser() -> argparse.ArgumentParser:
     set_parser = add("set", "change a setting and write it back to its file")
     set_parser.add_argument("path", metavar="PATH")
     set_parser.add_argument("value", metavar="VALUE")
+    set_parser.add_argument(
+        "--reason", metavar="TEXT", default=None, help="why the change is made (kept in history)"
+    )
     add("history", "list configuration changes as JSON Lines").add_argument(
         "path", metavar="PATH", nargs="?"
     )
@@ -76,7 +79,7 @@ def run(argv: Sequence[str]) -> str:
     if args.subcommand == "show":
         return commands.show(theatre, args.path, sources=args.sources)
     if args.subcommand == "set":
-        return commands.set_value(theatre, args.path, args.value, actor=actor, reason=None)
+        return commands.set_value(theatre, args.path, args.value, actor=actor, reason=args.reason)
     return commands.history(theatre, args.path)
 
 
