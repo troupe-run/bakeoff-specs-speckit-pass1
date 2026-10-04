@@ -186,11 +186,11 @@ processes with `TROUPE_ACTOR` unset and set to a different actor; earlier lines 
 
 ### Tests for User Story 4
 
-- [ ] T020 [P] [US4] Create `tests/e2e/test_lineage_persist.py`: build history with an import, a `set` under `agent:a` with `--reason r1`, a hand edit reconciled by `show`, and a `set` under `human:b`; capture `theatre.config("history").out` (raw text); then (a) run `history` again with `TROUPE_ACTOR` unset, (b) with `env={"TROUPE_ACTOR": "human:other", "LOGNAME": "someone-else"}`, (c) after one more `set` under `agent:c`: the earlier output is a byte-for-byte prefix of each later output (US4-1, US4-2, SC-304); also check, by reading the store through a fresh `ConfigStore(theatre.root).history()` in the test process, that each `HistoryRecord.lineage` equals the corresponding parsed line (lineage is in the store, not recomputed at print time — FR-306)
+- [X] T020 [P] [US4] Create `tests/e2e/test_lineage_persist.py`: build history with an import, a `set` under `agent:a` with `--reason r1`, a hand edit reconciled by `show`, and a `set` under `human:b`; capture `theatre.config("history").out` (raw text); then (a) run `history` again with `TROUPE_ACTOR` unset, (b) with `env={"TROUPE_ACTOR": "human:other", "LOGNAME": "someone-else"}`, (c) after one more `set` under `agent:c`: the earlier output is a byte-for-byte prefix of each later output (US4-1, US4-2, SC-304); also check, by reading the store through a fresh `ConfigStore(theatre.root).history()` in the test process, that each `HistoryRecord.lineage` equals the corresponding parsed line (lineage is in the store, not recomputed at print time — FR-306)
 
 ### Implementation for User Story 4
 
-- [ ] T021 [US4] Run T020; the foundation (T006) should already satisfy it. Deliberately make `history` print the *current* command's actor for `cli` events (instead of the stored one) and confirm T020 (b) fails; restore. Commit ("why": an audit trail that changes after the fact is not an audit trail)
+- [X] T021 [US4] Run T020; the foundation (T006) should already satisfy it. Deliberately make `history` print the *current* command's actor for `cli` events (instead of the stored one) and confirm T020 (b) fails; restore. Commit ("why": an audit trail that changes after the fact is not an audit trail)
 
 **Checkpoint**: all four stories work.
 
