@@ -126,7 +126,7 @@ in one invocation, repeated `set`s, PATH-filtered history (spec US2 scenarios 1�
 
 ### Tests for User Story 2
 
-- [ ] T015 [P] [US2] Create `tests/e2e/test_lineage_change.py` (use `theatre.events()`):
+- [X] T015 [P] [US2] Create `tests/e2e/test_lineage_change.py` (use `theatre.events()`):
   - `test_import_events_share_one_change`: `a: 1\nb: [x, y]\n` → the three import lines have one `change`, a non-empty string (US2-1);
   - `test_one_set_shares_one_change_across_set_and_remove`: `set b '[z]'` → `b.0` set and `b.1` remove share a `change` different from the import's (US2-2);
   - `test_one_hand_edit_reconcile_shares_one_change`: edit `a` and `b.0` by hand, `config show` → the two reconcile lines share a `change` (US2-3; step 2 D-14 coalescing);
@@ -138,7 +138,7 @@ in one invocation, repeated `set`s, PATH-filtered history (spec US2 scenarios 1�
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] Run T015; the foundation (T005 – T007) should already satisfy it. Fix any gap in `src/troupe/config/store.py` / `src/troupe/config/commands.py` (e.g. a `Lineage.begin` created before the reconcile and reused for the `set`). Deliberately (a) create one `Lineage` in `open_theatre` and reuse it for the `set`'s events and confirm `…separate_changes` fails; (b) call `Lineage.begin` per event in `store.record` and confirm `…shares_one_change` tests fail; restore. Commit ("why": a multi-value change can be reviewed as one unit)
+- [X] T016 [US2] Run T015; the foundation (T005 – T007) should already satisfy it. Fix any gap in `src/troupe/config/store.py` / `src/troupe/config/commands.py` (e.g. a `Lineage.begin` created before the reconcile and reused for the `set`). Deliberately (a) create one `Lineage` in `open_theatre` and reuse it for the `set`'s events and confirm `…separate_changes` fails; (b) call `Lineage.begin` per event in `store.record` and confirm `…shares_one_change` tests fail; restore. Commit ("why": a multi-value change can be reviewed as one unit)
 
 **Checkpoint**: what-else-changed is answered for every event.
 
