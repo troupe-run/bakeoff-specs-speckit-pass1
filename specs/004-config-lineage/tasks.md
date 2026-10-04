@@ -198,10 +198,10 @@ processes with `TROUPE_ACTOR` unset and set to a different actor; earlier lines 
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T022 [P] Update `README.md`: add `[--reason TEXT]` to the `set` line; a short "Lineage" paragraph: each history line also has `actor`, `via`, `at`, `reason`, `change`; `TROUPE_ACTOR=human:<id>|agent:<id>` (unset → your login name; anything else → exit 2); hand edits and the first import are recorded with actor `unknown`; one example line from `specs/004-config-lineage/contracts/cli.md`; add `specs/004-config-lineage/` to the links
-- [ ] T023 [P] Traceability notes in earlier specs: in `specs/002-config-file-sync/spec.md` Assumptions, append to the "History needs no field…" bullet "*(Superseded by step 4: `via` tells hand edits from `set`; see `specs/004-config-lineage/spec.md`.)*"; in `specs/001-config-load-show-set/contracts/cli.md` add a one-line note that history lines gain lineage fields in step 4
-- [ ] T024 Walk through `specs/004-config-lineage/quickstart.md` by hand and confirm each expected output
-- [ ] T025 Run the full gates and show output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; report any failure with its output. Commit polish ("why": docs and earlier specs agree with lineage, Principle VI)
+- [X] T022 [P] Update `README.md`: add `[--reason TEXT]` to the `set` line; a short "Lineage" paragraph: each history line also has `actor`, `via`, `at`, `reason`, `change`; `TROUPE_ACTOR=human:<id>|agent:<id>` (unset → your login name; anything else → exit 2); hand edits and the first import are recorded with actor `unknown`; one example line from `specs/004-config-lineage/contracts/cli.md`; add `specs/004-config-lineage/` to the links
+- [X] T023 [P] Traceability notes in earlier specs: in `specs/002-config-file-sync/spec.md` Assumptions, append to the "History needs no field…" bullet "*(Superseded by step 4: `via` tells hand edits from `set`; see `specs/004-config-lineage/spec.md`.)*"; in `specs/001-config-load-show-set/contracts/cli.md` add a one-line note that history lines gain lineage fields in step 4
+- [X] T024 Walk through `specs/004-config-lineage/quickstart.md` by hand and confirm each expected output
+- [X] T025 Run the full gates and show output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; report any failure with its output. Commit polish ("why": docs and earlier specs agree with lineage, Principle VI)
 
 ---
 

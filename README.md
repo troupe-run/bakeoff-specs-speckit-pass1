@@ -8,7 +8,7 @@ disturbing the hand-written files, and records every change as an event.
 ```sh
 uv run troupe config get PATH           [--theatre DIR]   # print a scalar setting
 uv run troupe config show [PATH] [--sources] [--theatre DIR]   # print a setting or a section as YAML
-uv run troupe config set PATH VALUE     [--theatre DIR]   # change it in the file that holds it
+uv run troupe config set PATH VALUE [--reason TEXT] [--theatre DIR]   # change it in the file that holds it
 uv run troupe config history [PATH]     [--theatre DIR]   # list changes as JSON Lines
 uv run troupe config watch              [--theatre DIR]   # record hand edits as they happen
 ```
@@ -32,6 +32,17 @@ uv run troupe config watch              [--theatre DIR]   # record hand edits as
   events, whatever was edited in the files since the last command. `watch` does the same within
   2 seconds of each edit until you stop it (Ctrl-C or SIGTERM); a formatting- or comment-only edit
   records nothing, and a `set` made while `watch` runs is recorded once.
+- Every history line also says who made the change, how, when, why, and what changed with it:
+
+  ```text
+  {"seq": 3, "op": "set", "path": "b.0", "old": "x", "new": "z", "actor": {"kind": "agent", "id": "coder-7"}, "via": "cli", "at": "2026-10-04T09:06:00.000003Z", "reason": "trim", "change": "5c2f…"}
+  ```
+
+  `actor` comes from `TROUPE_ACTOR=human:<id>` or `agent:<id>` (unset → you, by login name;
+  anything else → exit 2, for every command). `via` is `cli`, `file` (a hand edit) or `import`
+  (the first command); hand edits and imports have actor `{"kind": "unknown", "id": null}`.
+  `reason` is the text given with `set --reason`, else `null`. All events one `set`, one
+  reconcile or the import records share one `change` and one UTC `at`.
 - State (the event store) lives in `<theatre>/.troupe/events.sqlite3`, with
   `events.sqlite3.lock` beside it so that concurrent commands record each change once.
 
@@ -54,4 +65,5 @@ uv run ruff check . && uv run ruff format --check .
 
 Specification, design decisions and task list: [`specs/001-config-load-show-set/`](specs/001-config-load-show-set/)
 (load, show, set, history) and [`specs/002-config-file-sync/`](specs/002-config-file-sync/) (sync with
-files, watch) and [`specs/003-config-get-show/`](specs/003-config-get-show/) (get, show as YAML).
+files, watch) and [`specs/003-config-get-show/`](specs/003-config-get-show/) (get, show as YAML) and
+[`specs/004-config-lineage/`](specs/004-config-lineage/) (lineage).

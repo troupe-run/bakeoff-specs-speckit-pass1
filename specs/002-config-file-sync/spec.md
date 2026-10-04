@@ -311,4 +311,5 @@ otherwise non-local file systems where change notification is unreliable.
 - A theatre has at most one `watch` running at a time.
 - Hand edits are saved files; unsaved editor buffers are not visible to troupe.
 - History needs no field to tell hand edits from `set` commands: the contract asks for `set`/`remove`
-  events and does not ask for a source, so none is invented (Principle V).
+  events and does not ask for a source, so none is invented (Principle V). *(Superseded by step 4:
+  `via` tells hand edits from `set`; see `specs/004-config-lineage/spec.md`.)*
