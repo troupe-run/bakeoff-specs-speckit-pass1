@@ -173,8 +173,12 @@ inside items, and compare file bytes before and after.
   `model: file:model.yaml`; a new key under `agents.coder.model` is written as an override in
   `coder.yaml`, the file that contains the include reference it comes through (D-40).
 - **Ancestor present in an override**: when the deepest existing ancestor of a new key is a mapping
-  written in an override (even if the included file also has that mapping), the new key is written
-  into the override's mapping in the including file.
+  written in an override (even if the included file also has that mapping), it comes from the file
+  the override is written in (D-48): if that is the main file, the new key is written into the
+  override's mapping there.
+- **Override position not reachable through plain mappings** (the override already present at that
+  position is itself an include, e.g. `limits: file:limits.yaml` as an override) → exit 3, no file
+  changed (D-47).
 - **Ancestor in the including file's own content**: a new key whose deepest existing ancestor is not
   from an include is written as before (step 1 FR-022 behaviour), into the file that holds it.
 - **New key directly under the include's root** (`agents.coder.temperature` where `agents.coder` is
@@ -237,10 +241,12 @@ replaces**) at FR-400.
 - **FR-420**: A new key MUST be written in the file containing its deepest existing ancestor mapping,
   creating any missing intermediate mappings there, unless FR-421 applies.
 - **FR-421**: When that ancestor's content comes from an included YAML file (it is the include's root
-  or lies within the included content, and is not itself written in an override), the new key MUST be
-  written as an override in the including file — the file that contains the include reference through
-  which the ancestor is reached most directly (D-40) — with any missing intermediate mappings created
-  in the override. Existing override mappings on the way MUST be reused, never duplicated.
+  or lies within the included content; a merged mapping counts as coming from its override's file,
+  D-48), the new key MUST be written as an override in the including file — the file that contains
+  the include reference through which the ancestor is reached most directly (D-40) — with any missing
+  intermediate mappings created in the override. Existing override mappings on the way MUST be
+  reused, never duplicated. FR-424 takes precedence: an ancestor inside a list item is written in the
+  file that holds the list.
 - **FR-422**: A scalar-form include MUST first be converted to mapping form: in block context the key's
   line keeps its bytes up to and including the key's colon, followed by exactly the whitespace and
   end-of-line comment that followed the include string (nothing, if it had no comment); the include
@@ -315,6 +321,14 @@ Recorded per Constitution Principles V and VI.
 - **D-46 Key order of merged mappings.** Included order first, override-only keys after. Reason: an
   override changes a key's value, not its place, so `show` of a project that overrides one value still
   reads like the shared file.
+- **D-47 An override position that is itself an include.** When the override that must receive the
+  new key already holds an include at some step of its path (an override `limits: file:l.yaml`),
+  `set` exits 3. Reason: the key could go into the override or into `l.yaml`, and `l.yaml` may be
+  shared too; refusing cannot lose data (Principle I), and the user can write it by hand.
+- **D-48 Which file a merged mapping comes from.** A mapping whose keys come from both an included
+  file and an override counts, for FR-421, as coming from the file the override is written in.
+  Reason: the user has already chosen to override that section in that file; when that file is itself
+  included, the new key moves one level further out, so no shared file gains it.
 
 ### Out of contract
 

@@ -34,7 +34,7 @@
 - The technical terms in the spec (`$ref`, `file:` strings, YAML block/flow style, exit codes,
   stdout/stderr) are the user-facing vocabulary of the files and CLI fixed by the contract.
 - Step 1 FR-022 is replaced by FR-420 – FR-427; FR-020 is refined by FR-430 – FR-432.
-- Open points are resolved and recorded as D-40 … D-46 (Principle V). The most consequential is
+- Open points are resolved and recorded as D-40 … D-48 (Principle V); D-47 and D-48 were added while planning. The most consequential is
   D-40: with nested includes, the override goes in the nearest including file (literal reading of the
   contract). D-43 and D-44 refuse (exit 4 / exit 3) rather than guess where data could be lost.
 - Validation passed after one wording fix (FR-422: the space before the include string is removed so
