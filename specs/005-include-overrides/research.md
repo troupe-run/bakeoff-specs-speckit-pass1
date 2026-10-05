@@ -102,17 +102,23 @@ needed; `ruamel.yaml`'s composed nodes already give every span the planner needs
 - **Alternatives**: Render `$ref` from S's value — would requote; put a list item's `$ref` on its own
   line below `-` — larger diff and an unusual layout.
 
-## O-6 Verification identifies include roots by their reference
+## O-6 Verification identifies an override's include root by its reference
 
 - **Decision**: An override write's `EditPlan` anchors at the include root with `anchor_path` = the
-  root's path and `rest` = Q. `apply._identity` for a node with `written_as(node)` returns the
-  identity of that reference (G, offset) instead of the target file's; `_aliases` therefore finds the
-  root only where *this* reference is (or where G itself is included twice). The existing check —
-  value at every alias reads back as requested, every other leaf unchanged — then proves that the
-  shared file and other users of it are unaffected.
-- **Rationale**: Without it, a file included at two keys would make `_verify` expect the override at
-  both and refuse; with it, verification still guards against an override leaking anywhere else.
+  root's path and `rest` = Q, and is marked `by_site=True`. For such a plan, `apply._aliases`
+  compares nodes by the identity of `written_as(node)` (the including file and the reference's
+  offset), so it finds the root only where *this* reference is (or where the including file itself is
+  included twice). Every other plan keeps step 1's content identity (file, node kind, offset), so a
+  value or key written *into* an included file is still expected at every path that includes it
+  (step 1 `test_file_included_twice…`, and CR-B's `--in-include`). The existing check — value at every
+  alias reads back as requested, every other leaf unchanged — then proves an override affects only its
+  own site.
+- **Rationale**: Without the site identity, a file included at two keys would make `_verify` expect
+  the override at both and refuse; with only the site identity, writes into a shared file would be
+  expected at one path and refused when the other path changes too. The plan says which it is, because
+  only the planner knows which file it wrote.
 - **Alternatives**: Skip alias checks for overrides — would lose the "nothing else changed" guard.
+  (Amended while planning CR-B, `specs/006-set-in-include/research.md` I-3.)
 
 ## O-7 Existing values and whole-value replacement
 

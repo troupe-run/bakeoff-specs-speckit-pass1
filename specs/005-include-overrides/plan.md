@@ -120,7 +120,8 @@ decision area (where a new key goes, and conversion) gets one new module beside 
    or delegates to `planner._new_key` for in-place writes. Conversion per research O-5, using
    `render.render_block`/`render_flow`/`render_list_item` and the including file's `indent_step` and
    line ending.
-5. **Apply** (`apply.py`): `_identity(node)` uses `written_as(node)`'s file and offset when set.
+5. **Apply** (`apply.py`): for a plan marked `by_site` (override writes), `_aliases` compares
+   nodes by `written_as(node)`'s file and offset; other plans keep content identity (O-6).
 6. **Docs**: README "Overrides" paragraph (mapping form, where `set` writes); step 1 spec FR-022
    "replaced by step 5", FR-020 "refined by step 5".
 
