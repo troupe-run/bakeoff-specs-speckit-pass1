@@ -19,12 +19,14 @@ def apply_set(
     path: ConfigPath,
     value: NewNode,
     before_write: Callable[[], None] = lambda: None,
+    *,
+    in_include: bool = False,
 ) -> list[LeafEvent]:
     """Plan, verify and write `set PATH VALUE`; returns the leaf events it caused.
 
     `before_write` runs just before the file is written; it raises to refuse the write.
     """
-    plan = plan_set(loaded, path, value)
+    plan = plan_set(loaded, path, value, in_include=in_include)
     if plan is None or plan.new_text == plan.file.text:
         return []
     before = leaves(loaded.root)

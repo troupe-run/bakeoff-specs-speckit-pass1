@@ -6,7 +6,7 @@ from troupe.config.commands import resolve
 from troupe.config.leaves import to_value
 from troupe.config.loader import Loaded, load
 from troupe.config.paths import ConfigPath
-from troupe.config.tree import Located, LocatedMapping, LocatedScalar
+from troupe.config.tree import Located, LocatedMapping, LocatedScalar, shared_part
 
 CODER = "a: 1\nb: 2\nlimits: {retries: 2, timeout: 10}\ntools: [git, shell]\n"
 
@@ -107,3 +107,24 @@ def test_merged_nodes_remember_site_and_overrides(tmp_path: Path) -> None:
     limits = at(loaded, "coder.limits")
     assert isinstance(limits, LocatedMapping)
     assert limits.overrides is site.get("limits")
+
+
+def test_merged_mapping_keeps_its_base(tmp_path: Path) -> None:
+    """Step 5 CR-B research I-2: the base holds only the included file's entries, in order."""
+    loaded = loaded_with(tmp_path, "  z: 1\n  a: 9\n")
+    root = at(loaded, "coder")
+    assert isinstance(root, LocatedMapping) and root.base is not None
+    assert keys(root.base) == ["a", "b", "limits", "tools"]
+    assert {key.file.path.name for key, _ in root.base.entries} == {"c.yaml"}
+
+
+def test_shared_part_follows_nested_bases(tmp_path: Path) -> None:
+    """Step 5 CR-B: nested includes give the deepest file's mapping."""
+    write(tmp_path, "m.yaml", "a: 1\n")
+    write(tmp_path, "coder.yaml", "model: {$ref: file:m.yaml, b: 2}\n")
+    write(tmp_path, "troupe.yml", "coder:\n  $ref: file:coder.yaml\n  model:\n    c: 3\n")
+    model = at(load(tmp_path), "coder.model")
+    assert isinstance(model, LocatedMapping)
+    shared = shared_part(model)
+    assert shared.file.path.name == "m.yaml"
+    assert keys(shared) == ["a"]

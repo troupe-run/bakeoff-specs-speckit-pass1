@@ -47,7 +47,8 @@ class LocatedMapping:
     # The override mapping merged into this one; None = not merged (spec FR-401, research O-2).
     overrides: "LocatedMapping | None" = None
     # A merged mapping's included part before the overrides were merged in; its entries are
-    # only that file's (research O-4: the walk finds include sites through it).
+    # only that file's (research O-4: the walk finds include sites through it; CR-B writes
+    # `--in-include` keys into it).
     base: "LocatedMapping | None" = None
 
     @property
@@ -106,6 +107,14 @@ class TextInclude:
 
 
 type Located = LocatedScalar | LocatedMapping | LocatedSequence | TextInclude
+
+
+def shared_part(mapping: LocatedMapping) -> LocatedMapping:
+    """A merged mapping's part written in the included file, before any override (step 5 CR-B
+    D-51): `base` followed through nested merges, so nested includes give the deepest file."""
+    while mapping.base is not None:
+        mapping = mapping.base
+    return mapping
 
 
 def written_as(node: Located) -> "Located | None":

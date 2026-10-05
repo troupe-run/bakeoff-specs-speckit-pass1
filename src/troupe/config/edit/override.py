@@ -70,6 +70,8 @@ def place_new_key(
     value: NewNode,
     path: ConfigPath,
     walk: Walk,
+    *,
+    in_include: bool = False,
 ) -> EditPlan:
     """Plan a new key below `ancestor`, the deepest existing mapping on PATH."""
     merged = ancestor.overrides is not None

@@ -118,7 +118,13 @@ def show(theatre: Path, path_text: str | None, *, sources: bool) -> str:
 
 
 def set_value(
-    theatre: Path, path_text: str, value_text: str, actor: Actor, reason: str | None
+    theatre: Path,
+    path_text: str,
+    value_text: str,
+    actor: Actor,
+    reason: str | None,
+    *,
+    in_include: bool = False,
 ) -> str:
     path = ConfigPath.parse(path_text)
     value = parse_value(value_text)
@@ -126,7 +132,9 @@ def set_value(
     # load it, and `watch` then finds nothing to record (spec FR-130).
     with theatre_lock(theatre):
         loaded, store = open_theatre(theatre, reconcile=True)
-        events = apply_set(theatre, loaded, path, value, before_write=store.check_writable)
+        events = apply_set(
+            theatre, loaded, path, value, before_write=store.check_writable, in_include=in_include
+        )
         # Begun after open_theatre, so any import or reconcile above is a unit of its own with
         # its own change and at, and is never credited to this command's actor (spec D-30).
         store.record(events, Lineage.begin(actor, "cli", reason))

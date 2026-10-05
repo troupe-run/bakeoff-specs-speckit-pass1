@@ -58,7 +58,9 @@ class _Owner:
     key: LocatedScalar | None = None
 
 
-def plan_set(loaded: Loaded, path: ConfigPath, value: NewNode) -> EditPlan | None:
+def plan_set(
+    loaded: Loaded, path: ConfigPath, value: NewNode, *, in_include: bool = False
+) -> EditPlan | None:
     """Plan `set PATH VALUE`; None when the value is already what was asked (nothing to do)."""
     from troupe.config.edit.override import Walk, place_new_key
 
@@ -74,7 +76,10 @@ def plan_set(loaded: Loaded, path: ConfigPath, value: NewNode) -> EditPlan | Non
             child = node.get(segment)
             if child is None:
                 # Where a new key goes (spec FR-420 to FR-424): override.py decides.
-                return place_new_key(loaded, node, prefix, path.segments[depth:], value, path, walk)
+                rest = path.segments[depth:]
+                return place_new_key(
+                    loaded, node, prefix, rest, value, path, walk, in_include=in_include
+                )
             key = next(k for k, v in node.entries if v is child)
             owner = _Owner(node, key)
             node = child

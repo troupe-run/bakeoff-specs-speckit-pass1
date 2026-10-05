@@ -80,3 +80,43 @@ def test_theatre_defaults_to_environment_variable(ready: Theatre, tmp_path: Path
 def test_negative_number_value(ready: Theatre) -> None:
     assert ready.config("set", "a", "-3").code == 0
     assert ready.read("troupe.yml") == "a: -3\n"
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("get", "a", "--in-include"),
+        ("show", "--in-include"),
+        ("history", "--in-include"),
+        ("watch", "--in-include"),
+        ("set", "a", "2", "--in-include=yes"),
+    ],
+)
+def test_in_include_only_as_a_flag_of_set(ready: Theatre, args: tuple[str, ...]) -> None:
+    """Step 5 CR-B FR-466: every other use is an unknown option or a usage error."""
+    before = ready.snapshot()
+    assert_failed(ready.config(*args), 2, "--in-include")
+    assert ready.snapshot() == before
+    assert not (ready.root / ".troupe" / STORE_FILENAME).exists()
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("set", "--in-include", "a", "2"),
+        ("set", "a", "2", "--in-include"),
+        ("set", "a", "2", "--in-include", "--in-include"),
+    ],
+)
+def test_in_include_in_any_position_and_repeated(ready: Theatre, args: tuple[str, ...]) -> None:
+    """Step 5 CR-B FR-460."""
+    result = ready.config(*args)
+    assert (result.code, result.out, result.err) == (0, "", ""), result
+    assert ready.config("get", "a").out == "2\n"
+
+
+def test_in_include_with_reason(ready: Theatre) -> None:
+    """Step 5 CR-B FR-460, FR-465: the flag combines with --reason."""
+    result = ready.config("set", "a", "3", "--in-include", "--reason", "why")
+    assert result.code == 0, result
+    assert ready.events()[-1]["reason"] == "why"

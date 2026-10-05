@@ -39,6 +39,11 @@ def _parser() -> argparse.ArgumentParser:
     set_parser.add_argument(
         "--reason", metavar="TEXT", default=None, help="why the change is made (kept in history)"
     )
+    set_parser.add_argument(
+        "--in-include",
+        action="store_true",
+        help="write a new key into the included file instead of as an override",
+    )
     add("history", "list configuration changes as JSON Lines").add_argument(
         "path", metavar="PATH", nargs="?"
     )
@@ -79,7 +84,14 @@ def run(argv: Sequence[str]) -> str:
     if args.subcommand == "show":
         return commands.show(theatre, args.path, sources=args.sources)
     if args.subcommand == "set":
-        return commands.set_value(theatre, args.path, args.value, actor=actor, reason=args.reason)
+        return commands.set_value(
+            theatre,
+            args.path,
+            args.value,
+            actor=actor,
+            reason=args.reason,
+            in_include=args.in_include,
+        )
     return commands.history(theatre, args.path)
 
 
