@@ -14,6 +14,7 @@ from troupe.config.tree import Located, LocatedMapping, LocatedScalar, LocatedSe
 from troupe.errors import LoadError
 
 INCLUDE_PREFIX = "file:"
+REF_KEY = "$ref"  # the key of a mapping-form include (spec FR-400)
 
 
 def include_target(value: object) -> str | None:
@@ -74,12 +75,19 @@ class _Loader:
         return Loaded(root, self.files, self.composed)
 
     def build(
-        self, node: Node, source: SourceFile, in_flow: bool, chain: tuple[Path, ...]
+        self,
+        node: Node,
+        source: SourceFile,
+        in_flow: bool,
+        chain: tuple[Path, ...],
+        follow: bool = True,
     ) -> Located:
+        """Build the located tree for `node`; `follow=False` keeps a `file:` string unfollowed
+        (the value of `$ref`, which the enclosing mapping includes itself)."""
         if isinstance(node, ScalarNode):
             scalar = LocatedScalar(resolve_node(node, source.text), source, node, in_flow)
             target = include_target(scalar.value)
-            if target is None:
+            if target is None or not follow:
                 return scalar
             return self.include(scalar, target, chain)
         if isinstance(node, SequenceNode):
@@ -90,13 +98,53 @@ class _Loader:
         if isinstance(node, MappingNode):
             flow = in_flow or bool(node.flow_style)
             mapping = LocatedMapping(source, node, in_flow)
+            ref: LocatedScalar | None = None
             for key_node, value_node in node.value:
                 if not isinstance(key_node, ScalarNode):
                     raise LoadError(f"{source.path}: only scalar mapping keys are supported")
                 key = LocatedScalar(resolve_node(key_node, source.text), source, key_node, flow)
-                mapping.entries.append((key, self.build(value_node, source, flow, chain)))
-            return mapping
+                value = self.build(value_node, source, flow, chain, follow=key.value != REF_KEY)
+                if (
+                    key.value == REF_KEY
+                    and isinstance(value, LocatedScalar)
+                    and include_target(value.value) is not None
+                ):
+                    ref = value
+                mapping.entries.append((key, value))
+            if ref is None:
+                return mapping  # no `$ref`, or one that is not an include string (spec D-42)
+            return self.mapping_include(mapping, ref, chain)
         raise LoadError(f"{source.path}: unsupported YAML node")
+
+    def mapping_include(
+        self, raw: LocatedMapping, ref: LocatedScalar, chain: tuple[Path, ...]
+    ) -> Located:
+        """A mapping-form include: the included content deep-merged with the overrides (spec
+        FR-400 to FR-403, D-43; research O-3). `raw` is the mapping as written, `$ref` included."""
+        target = include_target(ref.value)
+        assert target is not None
+        content = self.include(ref, target, chain)
+        overrides = [(key, value) for key, value in raw.entries if value is not ref]
+        if isinstance(content, TextInclude):
+            if overrides:
+                raise LoadError(
+                    f"{raw.file.path}: {REF_KEY} {ref.value!r} names a non-YAML file; "
+                    "it cannot have overrides"
+                )
+            content.include_site = raw
+            return content
+        if not isinstance(content, LocatedMapping):
+            if overrides:
+                raise LoadError(
+                    f"{raw.file.path}: {REF_KEY} {ref.value!r} does not hold a mapping; "
+                    "overrides need one"
+                )
+            content.include_site = raw
+            return content
+        merged = merge(content, overrides, raw)
+        merged.included_by = ref
+        merged.include_site = raw
+        return merged
 
     def include(self, scalar: LocatedScalar, target: str, chain: tuple[Path, ...]) -> Located:
         path = (scalar.file.path.parent / target).resolve()
@@ -114,6 +162,35 @@ class _Loader:
         embedded = self.build(node, source, False, (*chain, path))
         embedded.included_by = scalar
         return embedded
+
+
+def merge(
+    base: LocatedMapping,
+    overrides: list[tuple[LocatedScalar, Located]],
+    written: LocatedMapping,
+) -> LocatedMapping:
+    """`base` deep-merged with `overrides` (spec FR-401, D-46).
+
+    Mappings merge key by key, recursively; any other override replaces. Overridden keys keep
+    their place in `base`; override-only keys follow in written order. Overridden entries are the
+    override's own key and value, so each still knows the file it is written in. `written` is the
+    override mapping as written (the merged mapping's `overrides`).
+    """
+    pending = {str(key.node.value): (key, value) for key, value in overrides}
+    merged = LocatedMapping(base.file, base.node, base.in_flow, overrides=written)
+    for key, value in base.entries:
+        override = pending.pop(str(key.node.value), None)
+        if override is None:
+            merged.entries.append((key, value))
+            continue
+        override_key, override_value = override
+        if isinstance(value, LocatedMapping) and isinstance(override_value, LocatedMapping):
+            nested = merge(value, override_value.entries, override_value)
+            merged.entries.append((override_key, nested))
+        else:
+            merged.entries.append(override)
+    merged.entries.extend(pending.values())
+    return merged
 
 
 class _Mark:

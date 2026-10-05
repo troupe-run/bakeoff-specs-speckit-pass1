@@ -53,7 +53,10 @@ def to_value(node: Located) -> Value:
 
 
 def written_value(node: Located) -> Value:
-    """The value as written in the files: includes appear as their `file:` strings."""
+    """The value as written in the files: includes appear as their `file:` strings, or as
+    their `$ref` mapping with its overrides."""
+    if node.include_site is not None:
+        return written_value(node.include_site)
     if node.included_by is not None:
         return node.included_by.value
     if isinstance(node, TextInclude):

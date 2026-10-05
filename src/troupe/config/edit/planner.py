@@ -21,7 +21,14 @@ from troupe.config.files import CRLF, LF, SourceFile
 from troupe.config.loader import Loaded
 from troupe.config.paths import ConfigPath, is_index
 from troupe.config.scalars import NewNode, NewScalar, Value, plain_value, scalars_equal
-from troupe.config.tree import Located, LocatedMapping, LocatedScalar, LocatedSequence, TextInclude
+from troupe.config.tree import (
+    Located,
+    LocatedMapping,
+    LocatedScalar,
+    LocatedSequence,
+    TextInclude,
+    written_as,
+)
 from troupe.errors import PathError, WriteRefused
 
 type Splice = tuple[int, int, str]
@@ -238,8 +245,9 @@ def _after_indicator(ctx: _Context, owner: _Owner, target_start: int) -> int:
 
 def content_end(ctx: _Context, node: Located) -> int:
     """Offset just past the last character of `node` as written in the file that holds it."""
-    if node.included_by is not None:
-        return node.included_by.end
+    written = written_as(node)
+    if written is not None:
+        return content_end(ctx, written)
     if isinstance(node, TextInclude):
         return node.include.end
     if isinstance(node, LocatedScalar):
@@ -261,18 +269,18 @@ def _last_line(ctx: _Context, node: Located) -> int:
     scalar, whose trailing blank lines belong to its value (research B-15).
     """
     tail = node
-    while tail.included_by is None:
-        if isinstance(tail, LocatedMapping) and tail.entries and not tail.flow:
+    while True:
+        written = written_as(tail)
+        if written is not None:
+            # An include ends where its reference does in this file (research O-2).
+            tail = written
+        elif isinstance(tail, LocatedMapping) and tail.entries and not tail.flow:
             tail = tail.entries[-1][1]
         elif isinstance(tail, LocatedSequence) and tail.items and not tail.flow:
             tail = tail.items[-1]
         else:
             break
-    if (
-        tail.included_by is None
-        and isinstance(tail, LocatedScalar)
-        and tail.style in (render.LITERAL, render.FOLDED)
-    ):
+    if isinstance(tail, LocatedScalar) and tail.style in (render.LITERAL, render.FOLDED):
         block = _block_scalar(ctx, tail, _column_before(ctx, tail.start))
         if block.chomp == "+":
             return block.last_block
@@ -288,8 +296,9 @@ def _style_of(node: Located | None) -> str | None:
     """The quoting style a new sibling copies (FR-027); plain when there is nothing to copy."""
     if node is None:
         return render.PLAIN
-    if node.included_by is not None:
-        node = node.included_by
+    written = written_as(node)
+    if written is not None:
+        node = written
     if isinstance(node, TextInclude):
         node = node.include
     if isinstance(node, LocatedScalar) and node.style in render.INLINE_STYLES:

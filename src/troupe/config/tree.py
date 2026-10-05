@@ -1,4 +1,9 @@
-"""The loaded configuration: every node remembers the file and span its bytes come from."""
+"""The loaded configuration: every node remembers the file and span its bytes come from.
+
+A mapping-form include (`$ref` plus overrides) is loaded merged: its entries are the included
+content's, with overridden entries taken from the including file (spec FR-401). Each entry still
+remembers the file it is written in.
+"""
 
 from dataclasses import dataclass, field
 
@@ -15,6 +20,7 @@ class LocatedScalar:
     node: ScalarNode
     in_flow: bool
     included_by: "LocatedScalar | None" = None
+    include_site: "LocatedMapping | None" = None
 
     @property
     def start(self) -> int:
@@ -37,6 +43,9 @@ class LocatedMapping:
     in_flow: bool
     entries: list[tuple[LocatedScalar, "Located"]] = field(default_factory=list)
     included_by: LocatedScalar | None = None
+    include_site: "LocatedMapping | None" = None
+    # The override mapping merged into this one; None = not merged (spec FR-401, research O-2).
+    overrides: "LocatedMapping | None" = None
 
     @property
     def flow(self) -> bool:
@@ -64,6 +73,7 @@ class LocatedSequence:
     in_flow: bool
     items: list["Located"] = field(default_factory=list)
     included_by: LocatedScalar | None = None
+    include_site: LocatedMapping | None = None
 
     @property
     def flow(self) -> bool:
@@ -85,6 +95,7 @@ class TextInclude:
     include: LocatedScalar
     target: SourceFile
     included_by: LocatedScalar | None = None
+    include_site: LocatedMapping | None = None
 
     @property
     def value(self) -> str:
@@ -92,3 +103,12 @@ class TextInclude:
 
 
 type Located = LocatedScalar | LocatedMapping | LocatedSequence | TextInclude
+
+
+def written_as(node: Located) -> "Located | None":
+    """The node that stands for the whole value in the including file: the mapping-form include
+    as written (`$ref` and overrides), else the `file:` string; None when `node` is not an include
+    root (research O-2)."""
+    if node.include_site is not None:
+        return node.include_site
+    return node.included_by

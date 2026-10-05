@@ -246,23 +246,28 @@ def assert_failed(result: Result, code: int, mention: str) -> None:
     assert mention in result.err, result
 
 
-def set_ok(theatre: Theatre, path: str, value: str) -> None:
-    result = theatre.config("set", path, value)
+def set_ok(theatre: Theatre, path: str, value: str, *options: str) -> None:
+    result = theatre.config("set", path, value, *options)
     assert result.code == 0, result
     assert result.out == ""
 
 
 def assert_set(
-    theatre: Theatre, files: dict[str, str], path: str, value: str, expected: dict[str, str]
+    theatre: Theatre,
+    files: dict[str, str],
+    path: str,
+    value: str,
+    expected: dict[str, str],
+    options: tuple[str, ...] = (),
 ) -> None:
-    """Write `files`, run `set PATH VALUE`, and check every file's exact bytes afterwards.
+    """Write `files`, run `set PATH VALUE [options]`, and check every file's exact bytes afterwards.
 
     `expected` lists the files that must change; every other file must keep its bytes.
     """
     for name, content in files.items():
         theatre.write(name, content)
     before = theatre.snapshot()
-    set_ok(theatre, path, value)
+    set_ok(theatre, path, value, *options)
     after = theatre.snapshot()
     wanted = dict(before)
     for name, content in expected.items():
@@ -271,12 +276,18 @@ def assert_set(
 
 
 def assert_refused(
-    theatre: Theatre, files: dict[str, str], path: str, value: str, code: int, mention: str
+    theatre: Theatre,
+    files: dict[str, str],
+    path: str,
+    value: str,
+    code: int,
+    mention: str,
+    options: tuple[str, ...] = (),
 ) -> None:
     """Write `files`, run a `set` that must fail, and check that no file changed."""
     for name, content in files.items():
         theatre.write(name, content)
     before = theatre.snapshot()
-    result = theatre.config("set", path, value)
+    result = theatre.config("set", path, value, *options)
     assert_failed(result, code, mention)
     assert theatre.snapshot() == before
