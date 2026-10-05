@@ -83,6 +83,11 @@ needed; `ruamel.yaml`'s composed nodes already give every span the planner needs
 - **Alternatives**: Decide from the ancestor alone — it does not know its include path; always the
   outermost include — rejected by D-40.
 
+- **Found in implementation**: an override merged into an include root makes a new merged mapping
+  that is not itself an include root, which would hide that include's site from the walk. Merged
+  mappings therefore keep their unmerged `base` (planned for CR-B, added here), and the walk
+  registers a site for each include root along the `base` chain (`override.Walk.enter`).
+
 ## O-5 Converting a scalar-form include
 
 - **Decision**: In `edit/override.py`, given the include scalar S (in file G) and Q:
@@ -96,6 +101,8 @@ needed; `ruamel.yaml`'s composed nodes already give every span the planner needs
     `- `.
   - **Flow context**: replace S's bytes with `{$ref: <S bytes>, <render_flow entry>}` (FR-423).
   - `step` and line ending are G's (step 1 `indent_step`, D-6). One `EditPlan` for G (FR-426).
+  - The key in front of S is looked up in G's composed YAML (`override._key_of`), not taken from
+    the walk: in a merged mapping the walk's key may be an override's key in another file.
 - **Rationale**: Smallest diff that yields the contract's shape; S's bytes are copied, so quoting is
   kept (D-45). Block vs compact for list items: compact keeps the item on one line and the comment in
   place.
