@@ -9,7 +9,7 @@ from troupe.config.leaves import LeafEvent, diff_events, leaves, to_value, writt
 from troupe.config.loader import Loaded, load
 from troupe.config.paths import ConfigPath, dotted_is_within
 from troupe.config.scalars import NewNode, Scalar, scalars_equal
-from troupe.config.tree import Located, LocatedMapping, LocatedSequence, TextInclude
+from troupe.config.tree import Located, LocatedMapping, LocatedSequence, TextInclude, written_as
 from troupe.errors import LoadError, TroupeError, WriteRefused
 
 
@@ -61,7 +61,8 @@ def _verify(
 ) -> None:
     """The new text must give exactly the intended value at PATH (and at every other path that
     shows the same bytes, e.g. a file included twice) and leave every other leaf unchanged."""
-    targets = [_join(alias, plan.rest) for alias in _aliases(before_loaded.root, plan.anchor)]
+    aliases = _aliases(before_loaded.root, plan.anchor, by_site=plan.by_site)
+    targets = [_join(alias, plan.rest) for alias in aliases]
     if not targets:
         targets = [path.dotted]
     for target in targets:
@@ -93,14 +94,22 @@ def _identity(node: Located) -> tuple[Path, str, int]:
     return node.file.path, type(node).__name__, node.start if node.node is not None else -1
 
 
-def _aliases(root: Located, anchor: Located) -> list[str]:
-    """Dotted paths of every node with the same source bytes as `anchor`."""
-    wanted = _identity(anchor)
+def _site_identity(node: Located) -> tuple[Path, str, int]:
+    """An include root identified by its reference in the including file (research O-6)."""
+    written = written_as(node)
+    return _identity(written if written is not None else node)
+
+
+def _aliases(root: Located, anchor: Located, *, by_site: bool = False) -> list[str]:
+    """Dotted paths of every node with the same source bytes as `anchor` (with `by_site`, the
+    same include reference)."""
+    identity = _site_identity if by_site else _identity
+    wanted = identity(anchor)
     found: list[str] = []
     stack: list[tuple[str, Located]] = [("", root)]
     while stack:
         prefix, node = stack.pop()
-        if _identity(node) == wanted:
+        if identity(node) == wanted:
             found.append(prefix)
         if isinstance(node, LocatedMapping):
             for key, value in node.entries:

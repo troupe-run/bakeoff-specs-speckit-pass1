@@ -108,7 +108,7 @@ override in the including file; shared files keep their bytes.
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Create `tests/e2e/test_overrides_new_key.py` (tests first):
+- [X] T011 [P] [US1] Create `tests/e2e/test_overrides_new_key.py` (tests first):
   - `test_contract_conversion_example` — `troupe.yml` `coder: file:agents/coder.yaml  # c\n`, `set coder.temperature 0.3` → exactly `coder:  # c\n  $ref: file:agents/coder.yaml\n  temperature: 0.3\n`, `coder.yaml` unchanged (SC-402, FR-422);
   - spec US1 scenario 1 (nested under `agents:` at indentation 2 → `$ref` at column 4), scenario 2 (existing mapping form: key added after the last override), scenario 3 (missing intermediate `limits.timeout` created in the override; `get …limits.retries` still `2`), scenario 4 (flow: `agents: {coder: file:agents/coder.yaml}` → `{coder: {$ref: file:agents/coder.yaml, temperature: 0.3}}`, FR-423), scenario 5 (one `set` event with `via` `cli`, none for `$ref`, FR-440);
   - `test_include_without_comment` (`coder: file:x.yaml` → `coder:` with no trailing space);
@@ -124,23 +124,23 @@ override in the including file; shared files keep their bytes.
   - `test_override_position_that_is_an_include_is_refused` (override `limits: file:l.yaml`, new key under `limits` → exit 3, no file changed, D-47);
   - `test_file_included_twice_gets_the_override_only_at_its_site` (`a: file:common.yaml\nb: file:common.yaml`; new key under `a` → override at `a` only; `get b.<key>` exits 5; research O-6);
   - `test_new_key_in_main_file_unchanged_behaviour` (ancestor in the main file → step 1 placement, FR-420)
-- [ ] T012 [US1] Update `tests/e2e/test_set_new_key.py::test_new_key_in_an_included_file` to expect the override in `troupe.yml` (`agents:\n  coder:\n    $ref: file:agents/coder.yaml\n    retries: 3\n`) and `agents/coder.yaml` unchanged; rename it `test_new_key_under_an_include_becomes_an_override` (it encodes the replaced step 1 FR-022; Principle VI)
+- [X] T012 [US1] Update `tests/e2e/test_set_new_key.py::test_new_key_in_an_included_file` to expect the override in `troupe.yml` (`agents:\n  coder:\n    $ref: file:agents/coder.yaml\n    retries: 3\n`) and `agents/coder.yaml` unchanged; rename it `test_new_key_under_an_include_becomes_an_override` (it encodes the replaced step 1 FR-022; Principle VI)
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] In `src/troupe/config/edit/planner.py` make `plan_set`'s walk track `site_of: dict[Path, tuple[Located, ConfigPath]]`: before stepping into a list item clear it; after stepping into a child with `written_as(child) is not None`, set `site_of[<target file of child>] = (child, here)` (target file: `child.target.path` for a `TextInclude`, else `child.file.path`). When a key is missing, call `override.place_new_key(loaded, node, prefix, path.segments[depth:], value, path, site_of)` instead of `_new_key` (comment: "spec FR-420 – FR-424; research O-4")
-- [ ] T014 [US1] Create `src/troupe/config/edit/override.py` (module docstring: "Where a new key goes when includes are involved, and how a scalar-form include becomes mapping form — spec FR-420 – FR-427, D-40, D-41, D-47, D-48; research O-4, O-5. The one place these decisions live.") with `place_new_key(...) -> EditPlan` per data-model "New-key placement":
+- [X] T013 [US1] In `src/troupe/config/edit/planner.py` make `plan_set`'s walk track `site_of: dict[Path, tuple[Located, ConfigPath]]`: before stepping into a list item clear it; after stepping into a child with `written_as(child) is not None`, set `site_of[<target file of child>] = (child, here)` (target file: `child.target.path` for a `TextInclude`, else `child.file.path`). When a key is missing, call `override.place_new_key(loaded, node, prefix, path.segments[depth:], value, path, site_of)` instead of `_new_key` (comment: "spec FR-420 – FR-424; research O-4")
+- [X] T014 [US1] Create `src/troupe/config/edit/override.py` (module docstring: "Where a new key goes when includes are involved, and how a scalar-form include becomes mapping form — spec FR-420 – FR-427, D-40, D-41, D-47, D-48; research O-4, O-5. The one place these decisions live.") with `place_new_key(...) -> EditPlan` per data-model "New-key placement":
   - `own(X)`: follow `overrides` from X while the mapping is merged; the innermost plain override mapping's `file`, else `X.file` (D-48);
   - in place (`own` is the main file `loaded.root.file`, or `own.path not in site_of`): `planner._new_key` on X if not merged, else on the innermost plain override mapping;
   - otherwise site `(root, root_path) = site_of[own]`, `Q = path.segments[len(root_path.segments):]`; mapping form (`root.include_site` set): walk Q's segments (all but the new ones) through `include_site`'s entries while the child exists and is a plain `LocatedMapping` with `file` equal to the site's file, `included_by is None` and `overrides is None`; an existing child that is anything else → `WriteRefused(f"{path}: the override for it in {file} is not a plain mapping; write it by hand")` (D-47); then `planner._new_key` on the deepest one with the remaining segments; scalar form → T015;
   - override plans set `anchor=root`, `anchor_path=root_path`, `rest=Q`, and `by_site=True` (add `by_site: bool = False` to `EditPlan`)
-- [ ] T015 [US1] In `src/troupe/config/edit/override.py` implement the conversion of a scalar-form include S (research O-5), using `planner._context` for the including file (its `step`, `eol`, `spans`):
+- [X] T015 [US1] In `src/troupe/config/edit/override.py` implement the conversion of a scalar-form include S (research O-5), using `planner._context` for the including file (its `step`, `eol`, `spans`):
   - block mapping value: splice `[after ':' , S.end)` → `""` (removes the space and the string; following whitespace and comment stay, FR-422); insert after the key's line `" " * (key column + step) + "$ref: " + S's original bytes` and `render.render_block(nested Q→value, key column + step, step)`;
   - block list item: replace S's bytes with `"$ref: " + S's bytes`; insert `render.render_block(…, dash column + 2, step)` after that line (D-41);
   - flow: replace S's bytes with `"{$ref: " + S's bytes + ", " + key + ": " + render.render_flow(…) + "}"` (FR-423);
   - one `EditPlan` for the including file (FR-426)
-- [ ] T016 [US1] In `src/troupe/config/edit/apply.py` `_aliases(root, anchor, by_site)`: when `by_site`, compare `_identity(written_as(node) or node)` with `_identity(written_as(anchor))`; otherwise keep content identity (research O-6). Pass `plan.by_site` from `_verify`
-- [ ] T017 [US1] Run T011–T012 to green; then run the whole suite. Break the conversion deliberately (e.g. keep the space before the comment) once to confirm `test_contract_conversion_example` fails
+- [X] T016 [US1] In `src/troupe/config/edit/apply.py` `_aliases(root, anchor, by_site)`: when `by_site`, compare `_identity(written_as(node) or node)` with `_identity(written_as(anchor))`; otherwise keep content identity (research O-6). Pass `plan.by_site` from `_verify`
+- [X] T017 [US1] Run T011–T012 to green; then run the whole suite. Break the conversion deliberately (e.g. keep the space before the comment) once to confirm `test_contract_conversion_example` fails
 
 **Checkpoint**: MVP — CR-A's core promise holds.
 

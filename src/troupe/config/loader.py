@@ -177,7 +177,7 @@ def merge(
     override mapping as written (the merged mapping's `overrides`).
     """
     pending = {str(key.node.value): (key, value) for key, value in overrides}
-    merged = LocatedMapping(base.file, base.node, base.in_flow, overrides=written)
+    merged = LocatedMapping(base.file, base.node, base.in_flow, overrides=written, base=base)
     for key, value in base.entries:
         override = pending.pop(str(key.node.value), None)
         if override is None:

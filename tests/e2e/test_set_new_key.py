@@ -102,7 +102,8 @@ def test_comment_only_file(theatre: Theatre) -> None:
     assert_set(theatre, files, "a", "1", {"troupe.yml": "# just a comment\na: 1\n"})
 
 
-def test_new_key_in_an_included_file(theatre: Theatre) -> None:
+def test_new_key_under_an_include_becomes_an_override(theatre: Theatre) -> None:
+    """Step 1 wrote this key into `coder.yaml`; step 5 CR-A keeps shared files shared."""
     files = {
         "troupe.yml": "agents:\n  coder: file:agents/coder.yaml\n",
         "agents/coder.yaml": "model: sonnet\n",
@@ -112,7 +113,7 @@ def test_new_key_in_an_included_file(theatre: Theatre) -> None:
         files,
         "agents.coder.retries",
         "3",
-        {"agents/coder.yaml": "model: sonnet\nretries: 3\n"},
+        {"troupe.yml": "agents:\n  coder:\n    $ref: file:agents/coder.yaml\n    retries: 3\n"},
     )
 
 

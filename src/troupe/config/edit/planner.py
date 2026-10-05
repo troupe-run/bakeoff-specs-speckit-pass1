@@ -45,6 +45,9 @@ class EditPlan:
     anchor_path: ConfigPath | None
     rest: tuple[str, ...]
     expected: Value
+    # Override writes are expected only where their include reference is, not wherever the
+    # included file appears (research O-6).
+    by_site: bool = False
 
 
 @dataclass
@@ -57,8 +60,11 @@ class _Owner:
 
 def plan_set(loaded: Loaded, path: ConfigPath, value: NewNode) -> EditPlan | None:
     """Plan `set PATH VALUE`; None when the value is already what was asked (nothing to do)."""
+    from troupe.config.edit.override import Walk, place_new_key
+
     node: Located = loaded.root
     owner: _Owner | None = None
+    walk = Walk()
     for depth, segment in enumerate(path.segments):
         here = ConfigPath(path.segments[: depth + 1])
         prefix = ConfigPath(path.segments[:depth]) if depth else None
@@ -67,7 +73,8 @@ def plan_set(loaded: Loaded, path: ConfigPath, value: NewNode) -> EditPlan | Non
                 raise PathError(f"{here}: {segment!r} is a list index but its parent is a mapping")
             child = node.get(segment)
             if child is None:
-                return _new_key(loaded, node, prefix, path.segments[depth:], value, path)
+                # Where a new key goes (spec FR-420 to FR-424): override.py decides.
+                return place_new_key(loaded, node, prefix, path.segments[depth:], value, path, walk)
             key = next(k for k, v in node.entries if v is child)
             owner = _Owner(node, key)
             node = child
@@ -81,8 +88,10 @@ def plan_set(loaded: Loaded, path: ConfigPath, value: NewNode) -> EditPlan | Non
                 raise PathError(f"{here}: index out of range (list has {len(node.items)} items)")
             owner = _Owner(node)
             node = node.items[index]
+            walk.enter_item()
         else:
             raise PathError(f"{here}: its parent is a scalar, not a mapping or list")
+        walk.enter(node, here)
     assert owner is not None
     return _replace(loaded, node, owner, value, path)
 
