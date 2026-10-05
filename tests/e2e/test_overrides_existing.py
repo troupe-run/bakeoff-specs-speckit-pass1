@@ -29,6 +29,7 @@ MERGED = "coder:\n  $ref: file:c.yaml\n  limits:\n    timeout: 30\n"
 def test_replacing_a_mapping_with_included_and_override_keys_is_refused(theatre: Theatre) -> None:
     files = {"troupe.yml": MERGED, "c.yaml": "limits:\n  retries: 2\n"}
     assert_refused(theatre, files, "coder.limits", "{a: 1}", 3, "cannot remove included keys")
+    assert "coder.limits" in theatre.config("set", "coder.limits", "{a: 1}").err  # SC-404
 
 
 def test_replacing_a_mapping_whose_keys_are_all_overridden_writes_the_override(
@@ -58,3 +59,8 @@ def test_overriding_text_include_writes_its_target(theatre: Theatre) -> None:
         "p.md": "x\n",
     }
     assert_set(theatre, files, "coder.prompt", "new", {"p.md": "new"})
+
+
+def test_set_on_a_ref_only_text_include_writes_its_target(theatre: Theatre) -> None:
+    files = {"troupe.yml": "p: {$ref: file:p.md}\n", "p.md": "old\n"}
+    assert_set(theatre, files, "p", "new", {"p.md": "new"})

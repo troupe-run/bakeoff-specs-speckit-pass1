@@ -150,6 +150,7 @@ def test_override_position_that_is_an_include_is_refused(theatre: Theatre) -> No
         "l.yaml": "timeout: 30\n",
     }
     assert_refused(theatre, files, "coder.limits.x", "1", 3, "is an include")
+    assert "coder.limits.x" in theatre.config("set", "coder.limits.x", "1").err  # SC-404
 
 
 def test_file_included_twice_gets_the_override_only_at_its_site(theatre: Theatre) -> None:
@@ -164,3 +165,20 @@ def test_new_key_with_ancestor_in_the_main_file_is_written_there(theatre: Theatr
     files = {"troupe.yml": "a:\n  b: 1\ninc: file:c.yaml\n", "c.yaml": "x: 1\n"}
     expected = "a:\n  b: 1\n  c: 2\ninc: file:c.yaml\n"
     assert_set(theatre, files, "a.c", "2", {"troupe.yml": expected})
+
+
+def test_new_key_into_a_flow_mapping_form_include(theatre: Theatre) -> None:
+    files = {"troupe.yml": "coder: {$ref: file:c.yaml, model: x}\n", "c.yaml": "a: 1\n"}
+    expected = "coder: {$ref: file:c.yaml, model: x, t: 1}\n"
+    assert_set(theatre, files, "coder.t", "1", {"troupe.yml": expected})
+
+
+def test_flow_list_item_include_converted_in_place(theatre: Theatre) -> None:
+    files = {"troupe.yml": "l: [file:a.yaml]\n", "a.yaml": "m: 1\n"}
+    assert_set(theatre, files, "l.0.t", "1", {"troupe.yml": "l: [{$ref: file:a.yaml, t: 1}]\n"})
+
+
+def test_new_multi_line_override_is_a_literal_block(theatre: Theatre) -> None:
+    files = {"troupe.yml": "c: file:c.yaml\n", "c.yaml": "a: 1\n"}
+    expected = "c:\n  $ref: file:c.yaml\n  p: |\n    l1\n    l2\n"
+    assert_set(theatre, files, "c.p", '"l1\\nl2\\n"', {"troupe.yml": expected})
