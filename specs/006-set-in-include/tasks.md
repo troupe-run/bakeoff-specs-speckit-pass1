@@ -59,7 +59,7 @@ step 1 rule; the including file is untouched.
 **Independent Test**: `assert_set(..., options=("--in-include",))` fixtures where only the included
 file changes.
 
-- [ ] T005 [P] [US1] Create `tests/e2e/test_set_in_include.py` (tests first):
+- [X] T005 [P] [US1] Create `tests/e2e/test_set_in_include.py` (tests first):
   - spec US1 scenario 1: `troupe.yml` `agents:\n  coder: file:agents/coder.yaml  # c\n`, `coder.yaml` `model: sonnet\n`; `set --in-include agents.coder.temperature 0.3` → `coder.yaml` exactly `model: sonnet\ntemperature: 0.3\n`, `troupe.yml` unchanged (FR-461);
   - scenario 2: missing intermediates `limits.retries` → `limits:\n  retries: 3\n` appended in `coder.yaml` (FR-461, FR-463);
   - scenario 3: merged ancestor (override `limits: {timeout: 30}` in `troupe.yml`, `coder.yaml` `limits:\n  retries: 2\n`) → `  backoff: 2` added under `limits` in `coder.yaml`, `troupe.yml` unchanged (FR-462, D-51);
@@ -70,7 +70,7 @@ file changes.
   - `test_flow_mapping_in_the_included_file` (`coder.yaml` `{model: x}` → `{model: x, temperature: 0.3}`, step 1 FR-034);
   - `test_file_included_twice_gets_the_key_under_both_paths` (`a: file:common.yaml\nb: file:common.yaml`; `set --in-include a.y 2` → `common.yaml` gains `y: 2`; `get b.y` prints `2`; history has `set` events for `a.y` and `b.y`, FR-465, research I-3);
   - `test_step_1_fixture_passes_again_with_the_option` (SC-462: the fixture of CR-A's renamed `test_new_key_under_an_include_becomes_an_override`, run with `--in-include`, expects step 1's original result `agents/coder.yaml` → `model: sonnet\nretries: 3\n`)
-- [ ] T006 [US1] In `src/troupe/config/edit/override.py` `place_new_key`, first branch: `if in_include:` return `planner._new_key(loaded, shared_part(X) if X.overrides is not None else X, …)` — a step 1 plan (`by_site=False`, content identity, research I-3), with the anchor path of X; comment "spec FR-461, FR-462, D-51: the step 1 rule, into the shared part of a merged mapping". Run T005 to green; break the branch once (e.g. drop `shared_part`) to confirm scenario 3 fails
+- [X] T006 [US1] In `src/troupe/config/edit/override.py` `place_new_key`, first branch: `if in_include:` return `planner._new_key(loaded, shared_part(X) if X.overrides is not None else X, …)` — a step 1 plan (`by_site=False`, content identity, research I-3), with the anchor path of X; comment "spec FR-461, FR-462, D-51: the step 1 rule, into the shared part of a merged mapping". Run T005 to green; break the branch once (e.g. drop `shared_part`) to confirm scenario 3 fails
 
 **Checkpoint**: MVP — CR-B's promise holds.
 

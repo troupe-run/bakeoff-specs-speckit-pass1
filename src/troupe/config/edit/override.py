@@ -3,7 +3,8 @@ form (spec FR-420 to FR-427, D-40, D-41, D-47, D-48; research O-4, O-5).
 
 Included files are shared between projects (CR-A), so a new key whose deepest existing ancestor
 comes from an included file is written as an override in the file holding the include reference.
-This module is the one place that decides it.
+`set --in-include` (step 5 CR-B) writes it into the included file instead. This module is the
+one place that decides either.
 """
 
 from dataclasses import dataclass, field, replace
@@ -17,7 +18,14 @@ from troupe.config.edit.planner import EditPlan, _context, _new_key
 from troupe.config.loader import REF_KEY, Loaded
 from troupe.config.paths import ConfigPath
 from troupe.config.scalars import NewNode, plain_value
-from troupe.config.tree import Located, LocatedMapping, LocatedScalar, TextInclude, written_as
+from troupe.config.tree import (
+    Located,
+    LocatedMapping,
+    LocatedScalar,
+    TextInclude,
+    shared_part,
+    written_as,
+)
 from troupe.errors import WriteRefused
 
 
@@ -75,6 +83,11 @@ def place_new_key(
 ) -> EditPlan:
     """Plan a new key below `ancestor`, the deepest existing mapping on PATH."""
     merged = ancestor.overrides is not None
+    if in_include:
+        # `set --in-include`: step 1's rule, into the file holding the ancestor; for a merged
+        # mapping, its part in the included file (step 5 CR-B FR-461, FR-462, D-51).
+        target = shared_part(ancestor) if merged else ancestor
+        return _new_key(loaded, target, ancestor_path, rest, value, path)
     inner = _innermost_override(ancestor) if merged else ancestor
     if merged and written_as(inner) is not None:
         # The override at this position is itself an include (spec D-47).
