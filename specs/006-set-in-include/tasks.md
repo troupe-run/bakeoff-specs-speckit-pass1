@@ -80,15 +80,15 @@ file changes.
 
 **Goal**: The option changes nothing but new-key placement under included content (D-50).
 
-- [ ] T007 [P] [US2] Add to `tests/e2e/test_set_in_include.py` a helper `same_with_and_without(theatre_factory, files, path, value)` that runs the `set` on two fresh theatres (`tmp_path / "plain"`, `tmp_path / "flag"`), one with `--in-include`, and asserts equal exit codes, equal snapshots (relative to each theatre) and equal history `(op, path, old, new, via, reason)` tuples. Use it for spec US2 scenarios 1–4: existing overridden value (override changes in `troupe.yml`), existing non-overridden value (changes in `coder.yaml`), new key with ancestor in the main file, list append in `coder.yaml`; plus key inside a list item of `coder.yaml`, a text-include target write, and a refused write (`set --in-include agents.coder '{a: 1}'` → exit 3 both ways) (FR-464, SC-461)
-- [ ] T008 [US2] Run T007; any difference means the flag leaks outside `place_new_key` — fix by removing that use (Principle IV: the flag is read in one place)
+- [X] T007 [P] [US2] Add to `tests/e2e/test_set_in_include.py` a helper `same_with_and_without(theatre_factory, files, path, value)` that runs the `set` on two fresh theatres (`tmp_path / "plain"`, `tmp_path / "flag"`), one with `--in-include`, and asserts equal exit codes, equal snapshots (relative to each theatre) and equal history `(op, path, old, new, via, reason)` tuples. Use it for spec US2 scenarios 1–4: existing overridden value (override changes in `troupe.yml`), existing non-overridden value (changes in `coder.yaml`), new key with ancestor in the main file, list append in `coder.yaml`; plus key inside a list item of `coder.yaml`, a text-include target write, and a refused write (`set --in-include agents.coder '{a: 1}'` → exit 3 both ways) (FR-464, SC-461)
+- [X] T008 [US2] Run T007; any difference means the flag leaks outside `place_new_key` — fix by removing that use (Principle IV: the flag is read in one place)
 
 ---
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T009 [P] README `set` section: document `--in-include` beside CR-A's override rules, with a one-line example and the D-50 note ("existing values, list appends and keys inside list items are unaffected"); link `specs/006-set-in-include/`
-- [ ] T010 Run the gates and show the output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; walk through `quickstart.md`
+- [X] T009 [P] README `set` section: document `--in-include` beside CR-A's override rules, with a one-line example and the D-50 note ("existing values, list appends and keys inside list items are unaffected"); link `specs/006-set-in-include/`
+- [X] T010 Run the gates and show the output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; walk through `quickstart.md`
 
 ---
 

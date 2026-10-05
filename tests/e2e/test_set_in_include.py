@@ -1,6 +1,10 @@
 """`set --in-include`: a new key goes into the included file, by step 1's rule (step 5 CR-B,
 FR-460 to FR-466, D-50, D-51)."""
 
+from pathlib import Path
+
+import pytest
+
 from tests.conftest import Theatre, assert_set
 
 FLAG = ("--in-include",)
@@ -78,3 +82,47 @@ def test_step_1_fixture_passes_again_with_the_flag(theatre: Theatre) -> None:
     }
     expected = {"agents/coder.yaml": "model: sonnet\nretries: 3\n"}
     assert_set(theatre, files, "agents.coder.retries", "3", expected, FLAG)
+
+
+# D-50: on anything but a new key under included content, the flag changes nothing.
+
+OVERRIDDEN = (
+    "agents:\n  coder:\n    $ref: file:agents/coder.yaml\n    model: sonnet\n"
+    "    prompt: file:p.md\nown:\n  a: 1\n"
+)
+SHARED = "model: opus\neffort: low\ntools: [git]\nsteps:\n  - name: build\n"
+
+
+def _outcome(root: Path, path: str, value: str, *options: str) -> tuple[object, ...]:
+    theatre = Theatre(root)
+    for name, content in {
+        "troupe.yml": OVERRIDDEN,
+        "agents/coder.yaml": SHARED,
+        "p.md": "old\n",
+    }.items():
+        theatre.write(name, content)
+    result = theatre.config("set", path, value, *options)
+    events = [
+        (e["op"], e["path"], e["old"], e["new"], e["via"], e["reason"]) for e in theatre.events()
+    ]
+    return result.code, result.out, theatre.snapshot(), events
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        ("agents.coder.model", "haiku"),  # existing value, overridden
+        ("agents.coder.effort", "high"),  # existing value, not overridden
+        ("own.b", "2"),  # new key, ancestor in the main file
+        ("agents.coder.tools.1", "lint"),  # list append in the shared file
+        ("agents.coder.steps.0.retries", "3"),  # key inside a list item of the shared file
+        ("agents.coder.prompt", "new"),  # text include target
+        ("agents.coder", "{a: 1}"),  # refused either way
+    ],
+)
+def test_flag_changes_nothing_else(tmp_path: Path, path: str, value: str) -> None:
+    plain = _outcome(tmp_path / "plain", path, value)
+    flagged = _outcome(tmp_path / "flag", path, value, *FLAG)
+    assert flagged == plain
+    expected_code = 3 if path == "agents.coder" else 0
+    assert plain[0] == expected_code
