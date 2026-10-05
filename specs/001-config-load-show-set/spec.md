@@ -190,10 +190,14 @@ then `config history` and `config history <path>`, and compare the JSON Lines ou
 **set — where the change is written**
 
 - **FR-020**: An existing value MUST be changed in the file that contains it.
+  *(Refined by step 5: an overridden value changes in its override; see
+  `specs/005-include-overrides/spec.md`, FR-430 – FR-432.)*
 - **FR-021**: For a text include, the target file's content MUST become VALUE exactly; if the target
   file used CRLF line endings, the new content MUST use CRLF. A non-string VALUE MUST produce exit 3.
 - **FR-022**: A new key MUST be written into the file containing the deepest existing ancestor
   mapping of PATH, creating any missing intermediate mappings in that file.
+  *(Replaced by step 5: a new key under included content is written as an override in the
+  including file; see `specs/005-include-overrides/spec.md`, FR-420 – FR-427.)*
 - **FR-023**: A PATH whose last segment equals a list's length MUST append to that list; a larger
   index MUST produce exit 5.
 - **FR-024**: Replacing the value at a path whose whole value comes from an include (e.g.

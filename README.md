@@ -28,6 +28,21 @@ uv run troupe config watch              [--theatre DIR]   # record hand edits as
 - `set` changes only the bytes of the value: comments, quoting, indentation and layout elsewhere
   stay exactly as written. Every edit is re-read and checked before the file is replaced; if it
   cannot be written safely, nothing changes and the command exits 3.
+- An include may carry **overrides**: write it as a mapping with `$ref` and the keys to change.
+  The value is the included content deep-merged with them (mappings merge; scalars and lists
+  replace). Included files are shared, so `set` never adds a new key to one: a new key under an
+  included section is written as an override in the file holding the include, converting a
+  one-line include first:
+
+  ```yaml
+  coder: file:agents/coder.yaml  # c       →    coder:  # c
+                                                  $ref: file:agents/coder.yaml
+                                                  temperature: 0.3
+  ```
+
+  Existing values still change where they live (the override if overridden, else the included
+  file); list appends and keys inside list items go to the file holding the list. Overrides on a
+  non-YAML include exit 4; replacing a section partly from an included file exits 3.
 - Hand edits are recorded too: every command except `history` first records, as `set`/`remove`
   events, whatever was edited in the files since the last command. `watch` does the same within
   2 seconds of each edit until you stop it (Ctrl-C or SIGTERM); a formatting- or comment-only edit
@@ -66,4 +81,5 @@ uv run ruff check . && uv run ruff format --check .
 Specification, design decisions and task list: [`specs/001-config-load-show-set/`](specs/001-config-load-show-set/)
 (load, show, set, history) and [`specs/002-config-file-sync/`](specs/002-config-file-sync/) (sync with
 files, watch) and [`specs/003-config-get-show/`](specs/003-config-get-show/) (get, show as YAML) and
-[`specs/004-config-lineage/`](specs/004-config-lineage/) (lineage).
+[`specs/004-config-lineage/`](specs/004-config-lineage/) (lineage) and
+[`specs/005-include-overrides/`](specs/005-include-overrides/) (overrides).

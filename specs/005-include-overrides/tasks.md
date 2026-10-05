@@ -165,9 +165,9 @@ whole-mapping replacements refuse.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T022 [P] README: an "Overrides" paragraph under includes (mapping form, merge rules, where `set` writes a new key, that existing values change where they live, the exit-4/exit-3 cases) with the contract's conversion example; link `specs/005-include-overrides/`
-- [ ] T023 [P] `specs/001-config-load-show-set/spec.md`: mark FR-022 "*(Replaced by step 5: see `specs/005-include-overrides/spec.md`, FR-420 – FR-427.)*" and FR-020 "*(Refined by step 5, FR-430 – FR-432.)*", as FR-015 was marked by step 3
-- [ ] T024 Run the gates and show the output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; walk through `quickstart.md`
+- [X] T022 [P] README: an "Overrides" paragraph under includes (mapping form, merge rules, where `set` writes a new key, that existing values change where they live, the exit-4/exit-3 cases) with the contract's conversion example; link `specs/005-include-overrides/`
+- [X] T023 [P] `specs/001-config-load-show-set/spec.md`: mark FR-022 "*(Replaced by step 5: see `specs/005-include-overrides/spec.md`, FR-420 – FR-427.)*" and FR-020 "*(Refined by step 5, FR-430 – FR-432.)*", as FR-015 was marked by step 3
+- [X] T024 Run the gates and show the output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`; walk through `quickstart.md`
 
 ---
 
