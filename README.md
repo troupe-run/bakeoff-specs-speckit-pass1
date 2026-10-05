@@ -8,7 +8,7 @@ disturbing the hand-written files, and records every change as an event.
 ```sh
 uv run troupe config get PATH           [--theatre DIR]   # print a scalar setting
 uv run troupe config show [PATH] [--sources] [--theatre DIR]   # print a setting or a section as YAML
-uv run troupe config set PATH VALUE [--reason TEXT] [--theatre DIR]   # change it in the file that holds it
+uv run troupe config set PATH VALUE [--reason TEXT] [--in-include] [--theatre DIR]   # change it in the file that holds it
 uv run troupe config history [PATH]     [--theatre DIR]   # list changes as JSON Lines
 uv run troupe config watch              [--theatre DIR]   # record hand edits as they happen
 ```
@@ -43,6 +43,10 @@ uv run troupe config watch              [--theatre DIR]   # record hand edits as
   Existing values still change where they live (the override if overridden, else the included
   file); list appends and keys inside list items go to the file holding the list. Overrides on a
   non-YAML include exit 4; replacing a section partly from an included file exits 3.
+- When a new key genuinely belongs in the shared file, say so: `set --in-include PATH VALUE`
+  writes it into the included file instead (the including file is not touched). The flag changes
+  nothing else: existing values, list appends and keys inside list items land where they would
+  without it.
 - Hand edits are recorded too: every command except `history` first records, as `set`/`remove`
   events, whatever was edited in the files since the last command. `watch` does the same within
   2 seconds of each edit until you stop it (Ctrl-C or SIGTERM); a formatting- or comment-only edit
@@ -82,4 +86,5 @@ Specification, design decisions and task list: [`specs/001-config-load-show-set/
 (load, show, set, history) and [`specs/002-config-file-sync/`](specs/002-config-file-sync/) (sync with
 files, watch) and [`specs/003-config-get-show/`](specs/003-config-get-show/) (get, show as YAML) and
 [`specs/004-config-lineage/`](specs/004-config-lineage/) (lineage) and
-[`specs/005-include-overrides/`](specs/005-include-overrides/) (overrides).
+[`specs/005-include-overrides/`](specs/005-include-overrides/) (overrides) and
+[`specs/006-set-in-include/`](specs/006-set-in-include/) (`set --in-include`).
