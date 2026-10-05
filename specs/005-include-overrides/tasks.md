@@ -151,15 +151,15 @@ override in the including file; shared files keep their bytes.
 **Goal**: Overridden values change in the override; others in the file they come from; ambiguous
 whole-mapping replacements refuse.
 
-- [ ] T018 [P] [US3] Create `tests/e2e/test_overrides_existing.py`: spec US3 scenarios 1–3 (override changed in `troupe.yml` only; non-overridden `effort` changed in `coder.yaml` only; no-op writes nothing and records nothing); `test_replacing_a_merged_mapping_is_refused` (`set agents.coder.limits '{a: 1}'` when `retries` comes from `coder.yaml` → exit 3, D-44); `test_replacing_an_override_only_mapping_writes_the_override` (all keys overridden → replaced in `troupe.yml`, research O-7); `test_replacing_a_mapping_form_include_is_refused` (`set agents.coder '{…}'` → exit 3, FR-432); `test_overridden_text_include_override_writes_its_target` (override `prompt: file:p.md` → `set agents.coder.prompt x` writes `p.md`)
-- [ ] T019 [US3] In `src/troupe/config/edit/planner.py` `_replace`: if the target is a merged `LocatedMapping` (`overrides is not None`, not an include root) and any entry, recursively, has a `file` other than the override's file → `WriteRefused(f"{path}: its keys come from {base file} and from overrides in {override file}; an override cannot remove included keys")` (D-44); if every entry is the override's, replace the override mapping instead (research O-7). Run T018 to green
+- [X] T018 [P] [US3] Create `tests/e2e/test_overrides_existing.py`: spec US3 scenarios 1–3 (override changed in `troupe.yml` only; non-overridden `effort` changed in `coder.yaml` only; no-op writes nothing and records nothing); `test_replacing_a_merged_mapping_is_refused` (`set agents.coder.limits '{a: 1}'` when `retries` comes from `coder.yaml` → exit 3, D-44); `test_replacing_an_override_only_mapping_writes_the_override` (all keys overridden → replaced in `troupe.yml`, research O-7); `test_replacing_a_mapping_form_include_is_refused` (`set agents.coder '{…}'` → exit 3, FR-432); `test_overridden_text_include_override_writes_its_target` (override `prompt: file:p.md` → `set agents.coder.prompt x` writes `p.md`)
+- [X] T019 [US3] In `src/troupe/config/edit/planner.py` `_replace`: if the target is a merged `LocatedMapping` (`overrides is not None`, not an include root) and any entry, recursively, has a `file` other than the override's file → `WriteRefused(f"{path}: its keys come from {base file} and from overrides in {override file}; an override cannot remove included keys")` (D-44); if every entry is the override's, replace the override mapping instead (research O-7). Run T018 to green
 
 ---
 
 ## Phase 6: User Story 4 - Lists stay in the file that holds them (Priority: P2)
 
-- [ ] T020 [P] [US4] Create `tests/e2e/test_overrides_lists.py`: spec US4 scenarios 1–3 (append in `coder.yaml`; key inside a list item of `coder.yaml` written there; append to an override list in `troupe.yml`); `test_key_inside_an_item_of_an_override_list` (written in `troupe.yml`); each asserts every other file's bytes unchanged (FR-424)
-- [ ] T021 [US4] Run T020; any failure is a `site_of` clearing bug in T013 — fix it there
+- [X] T020 [P] [US4] Create `tests/e2e/test_overrides_lists.py`: spec US4 scenarios 1–3 (append in `coder.yaml`; key inside a list item of `coder.yaml` written there; append to an override list in `troupe.yml`); `test_key_inside_an_item_of_an_override_list` (written in `troupe.yml`); each asserts every other file's bytes unchanged (FR-424)
+- [X] T021 [US4] Run T020; any failure is a `site_of` clearing bug in T013 — fix it there
 
 ---
 

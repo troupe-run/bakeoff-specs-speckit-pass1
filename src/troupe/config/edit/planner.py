@@ -321,6 +321,12 @@ def _style_of(node: Located | None) -> str | None:
 def _replace(
     loaded: Loaded, target: Located, owner: _Owner, value: NewNode, path: ConfigPath
 ) -> EditPlan | None:
+    if (
+        isinstance(target, LocatedMapping)
+        and target.overrides is not None
+        and target.included_by is None
+    ):
+        target = _override_to_replace(target, path)
     if target.included_by is not None:
         raise WriteRefused(
             f"{path}: its whole value comes from include {target.included_by.value!r} "
@@ -338,6 +344,22 @@ def _replace(
     else:
         _replace_collection(ctx, target, owner, value)
     return EditPlan(ctx.file, ctx.result(), target, anchor_path, (), expected)
+
+
+def _override_to_replace(target: LocatedMapping, path: ConfigPath) -> LocatedMapping:
+    """A merged mapping can be replaced only through its override, and only when the included
+    file contributes no key: an override cannot remove included keys (spec FR-432, D-44)."""
+    assert target.base is not None and target.overrides is not None
+    overridden = {str(key.value) for key, _ in target.overrides.entries}
+    included = [
+        str(key.value) for key, _ in target.base.entries if str(key.value) not in overridden
+    ]
+    if included:
+        raise WriteRefused(
+            f"{path}: {', '.join(included)} come from {target.base.file.path}; an override "
+            f"in {target.overrides.file.path} cannot remove included keys"
+        )
+    return target.overrides
 
 
 def _same(target: Located, expected: Value) -> bool:
