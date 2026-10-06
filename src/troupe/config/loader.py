@@ -5,12 +5,20 @@ from pathlib import Path
 from typing import Any, Literal
 
 from ruamel.yaml import YAML
+from ruamel.yaml.composer import Composer
 from ruamel.yaml.error import YAMLError
+from ruamel.yaml.events import AliasEvent
 from ruamel.yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
 from troupe.config.files import SourceFile, find_config, is_yaml_name, read_source
-from troupe.config.scalars import resolve_node
-from troupe.config.tree import Located, LocatedMapping, LocatedScalar, LocatedSequence, TextInclude
+from troupe.config.scalars import ALIAS_NAME, ALIAS_TARGET, resolve_node
+from troupe.config.tree import (
+    Located,
+    LocatedMapping,
+    LocatedScalar,
+    LocatedSequence,
+    TextInclude,
+)
 from troupe.errors import LoadError
 
 INCLUDE_PREFIX = "file:"
@@ -31,10 +39,58 @@ class Loaded:
     composed: dict[Path, Any] = field(default_factory=dict)
 
 
+class _AliasComposer(Composer):
+    """ruamel returns the anchored node itself for an alias; this returns a stand-in instead, a
+    shallow copy spanning the `*name` token, so a value reached through an alias can be told from
+    one reached through its anchor (step 6). The stand-in's children are the anchored node's."""
+
+    def compose_node(self, parent: Any, index: Any) -> Any:
+        if not self.parser.check_event(AliasEvent):
+            return super().compose_node(parent, index)
+        event = self.parser.peek_event()
+        target = super().compose_node(parent, index)
+        kind = _ALIAS_KINDS[type(target)]
+        stand_in = kind.__new__(kind)
+        for cls in type(target).__mro__:
+            for slot in getattr(cls, "__slots__", ()):
+                if hasattr(target, slot):
+                    setattr(stand_in, slot, getattr(target, slot))
+        stand_in.start_mark = event.start_mark
+        stand_in.end_mark = event.end_mark
+        stand_in.anchor = None
+        setattr(stand_in, ALIAS_NAME, event.anchor)
+        setattr(stand_in, ALIAS_TARGET, target)
+        return stand_in
+
+
+_STAND_IN_SLOTS = (ALIAS_NAME, ALIAS_TARGET)
+
+
+class _AliasScalar(ScalarNode):
+    __slots__ = _STAND_IN_SLOTS
+
+
+class _AliasSequence(SequenceNode):
+    __slots__ = _STAND_IN_SLOTS
+
+
+class _AliasMapping(MappingNode):
+    __slots__ = _STAND_IN_SLOTS
+
+
+_ALIAS_KINDS: dict[type[Node], type[Node]] = {
+    ScalarNode: _AliasScalar,
+    SequenceNode: _AliasSequence,
+    MappingNode: _AliasMapping,
+}
+
+
 def compose(source: SourceFile) -> Any:
     """Compose one file into ruamel nodes; positions are offsets into `source.text`."""
+    yaml = YAML(typ="rt")
+    yaml.Composer = _AliasComposer
     try:
-        return YAML(typ="rt").compose(source.text)
+        return yaml.compose(source.text)
     except YAMLError as error:
         raise LoadError(f"{source.path}: invalid YAML: {error}") from None
 
@@ -196,6 +252,11 @@ def merge(
 class _Mark:
     def __init__(self, index: int) -> None:
         self.index = index
+
+
+def reload(loaded: Loaded, overrides: dict[Path, str]) -> Loaded:
+    """Load the same configuration again, with `overrides` substituting file texts."""
+    return _Loader(overrides).load(loaded.root.file.path)
 
 
 def load(theatre: Path, overrides: dict[Path, str] | None = None) -> Loaded:

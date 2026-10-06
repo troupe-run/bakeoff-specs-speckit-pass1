@@ -30,6 +30,10 @@ _NAN = re.compile(r"\.nan|\.NaN|\.NAN")
 
 _TAG_PREFIX = "tag:yaml.org,2002:"
 
+# Set by the loader's composer on the stand-in node it returns for an alias (step 6).
+ALIAS_NAME = "troupe_alias_name"  # the anchor's name
+ALIAS_TARGET = "troupe_alias_target"  # the anchored node
+
 
 def resolve_plain(text: str) -> Scalar:
     """Type a plain scalar's text by the YAML 1.2 core schema."""
@@ -56,12 +60,14 @@ def resolve_plain(text: str) -> Scalar:
 
 def resolve_node(node: ScalarNode, source: str) -> Scalar:
     """Type a composed scalar node. `source` is the text the node was composed from."""
+    # An alias is typed as the node it refers to (step 6).
+    node = getattr(node, ALIAS_TARGET, node)
     text: str = node.value
     if node.style == ">":
         # ruamel's round-trip composer marks fold points with BEL; a folded scalar cannot hold
         # a real BEL (it is not printable), so the markers are removed.
         text = text.replace("\a", "")
-    explicit = source[node.start_mark.index : node.start_mark.index + 1] == "!"
+    explicit = source.startswith("!", content_start(source, node))
     if explicit and isinstance(node.tag, str) and node.tag.startswith(_TAG_PREFIX):
         kind = node.tag[len(_TAG_PREFIX) :]
         if kind == "str":
@@ -79,6 +85,31 @@ def resolve_node(node: ScalarNode, source: str) -> Scalar:
     if node.style is None:
         return resolve_plain(text)
     return text
+
+
+def content_start(text: str, node: Node) -> int:
+    """Where a node's own bytes start: after its `&anchor`, so a change to the value keeps the
+    anchor. An anchored collection starts at its first entry; an empty anchored scalar just after
+    the anchor."""
+    offset = int(node.start_mark.index)
+    if not text.startswith("&", offset):
+        return offset
+    while offset < len(text) and text[offset] not in " \t\r\n,[]{}":
+        offset += 1
+    anchor_end = offset
+    while offset < len(text):
+        if text[offset] in " \t":
+            offset += 1
+        elif isinstance(node, ScalarNode) and text[offset] in "\r\n#":
+            return anchor_end if node.value == "" else offset
+        elif text[offset] in "\r\n":
+            offset += 1
+        elif text[offset] == "#":
+            while offset < len(text) and text[offset] not in "\r\n":
+                offset += 1
+        else:
+            break
+    return offset
 
 
 def scalars_equal(a: Value, b: Value) -> bool:

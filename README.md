@@ -8,7 +8,7 @@ disturbing the hand-written files, and records every change as an event.
 ```sh
 uv run troupe config get PATH           [--theatre DIR]   # print a scalar setting
 uv run troupe config show [PATH] [--sources] [--theatre DIR]   # print a setting or a section as YAML
-uv run troupe config set PATH VALUE [--reason TEXT] [--in-include] [--theatre DIR]   # change it in the file that holds it
+uv run troupe config set PATH VALUE [--reason TEXT] [--in-include] [--expand-alias] [--theatre DIR]   # change it in the file that holds it
 uv run troupe config history [PATH]     [--theatre DIR]   # list changes as JSON Lines
 uv run troupe config watch              [--theatre DIR]   # record hand edits as they happen
 ```
@@ -47,6 +47,17 @@ uv run troupe config watch              [--theatre DIR]   # record hand edits as
   writes it into the included file instead (the including file is not touched). The flag changes
   nothing else: existing values, list appends and keys inside list items land where they would
   without it.
+- YAML anchors are shared: setting a value defined at an anchor (`&name`) changes it at the anchor,
+  and so everywhere it is aliased. A path reached **through** an alias (`*name`) is refused (exit 3);
+  `set --expand-alias PATH VALUE` first replaces that alias with a block-style copy of the anchored
+  value, then sets the value in the copy (other aliases still refer to the anchor). Merge keys
+  (`<<`) are never written.
+
+  ```yaml
+  coder:                                  coder:
+    settings: *d          →                 settings:  # expanded from *d by troupe
+                                              model: sonnet
+  ```
 - Hand edits are recorded too: every command except `history` first records, as `set`/`remove`
   events, whatever was edited in the files since the last command. `watch` does the same within
   2 seconds of each edit until you stop it (Ctrl-C or SIGTERM); a formatting- or comment-only edit

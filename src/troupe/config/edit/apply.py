@@ -8,8 +8,16 @@ from troupe.config.files import atomic_write, check_writable
 from troupe.config.leaves import LeafEvent, diff_events, leaves, to_value, written_value
 from troupe.config.loader import Loaded, load
 from troupe.config.paths import ConfigPath, dotted_is_within
-from troupe.config.scalars import NewNode, Scalar, scalars_equal
-from troupe.config.tree import Located, LocatedMapping, LocatedSequence, TextInclude, written_as
+from troupe.config.scalars import NewNode, Scalar, content_start, scalars_equal
+from troupe.config.tree import (
+    Located,
+    LocatedMapping,
+    LocatedSequence,
+    TextInclude,
+    alias_name,
+    alias_target,
+    written_as,
+)
 from troupe.errors import LoadError, TroupeError, WriteRefused
 
 
@@ -21,12 +29,13 @@ def apply_set(
     before_write: Callable[[], None] = lambda: None,
     *,
     in_include: bool = False,
+    expand_alias: bool = False,
 ) -> list[LeafEvent]:
     """Plan, verify and write `set PATH VALUE`; returns the leaf events it caused.
 
     `before_write` runs just before the file is written; it raises to refuse the write.
     """
-    plan = plan_set(loaded, path, value, in_include=in_include)
+    plan = plan_set(loaded, path, value, in_include=in_include, expand_alias=expand_alias)
     if plan is None or plan.new_text == plan.file.text:
         return []
     before = leaves(loaded.root)
@@ -63,9 +72,11 @@ def _verify(
 ) -> None:
     """The new text must give exactly the intended value at PATH (and at every other path that
     shows the same bytes, e.g. a file included twice) and leave every other leaf unchanged."""
-    aliases = _aliases(before_loaded.root, plan.anchor, by_site=plan.by_site)
+    basis = plan.basis or before_loaded
+    aliases = _aliases(basis.root, plan.anchor, by_site=plan.by_site)
     targets = [_join(alias, plan.rest) for alias in aliases]
-    if not targets:
+    if not targets or alias_name(plan.anchor) is not None:
+        # Replacing a YAML alias changes it alone, not its anchor (step 6).
         targets = [path.dotted]
     for target in targets:
         try:
@@ -91,8 +102,15 @@ def _join(alias: str, rest: tuple[str, ...]) -> str:
 
 
 def _identity(node: Located) -> tuple[Path, str, int]:
+    """A YAML alias has its anchor's identity: it shows the same bytes (step 6)."""
     if isinstance(node, TextInclude):
         return node.target.path, "text", 0
+    if alias_name(node) is not None:
+        return (
+            node.file.path,
+            type(node).__name__,
+            content_start(node.file.text, alias_target(node)),
+        )
     return node.file.path, type(node).__name__, node.start if node.node is not None else -1
 
 

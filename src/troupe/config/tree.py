@@ -6,11 +6,12 @@ remembers the file it is written in.
 """
 
 from dataclasses import dataclass, field
+from typing import Any, TypeGuard
 
 from ruamel.yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 from troupe.config.files import SourceFile
-from troupe.config.scalars import Scalar
+from troupe.config.scalars import ALIAS_NAME, ALIAS_TARGET, Scalar, content_start
 
 
 @dataclass(eq=False)
@@ -24,7 +25,7 @@ class LocatedScalar:
 
     @property
     def start(self) -> int:
-        return int(self.node.start_mark.index)
+        return content_start(self.file.text, self.node)
 
     @property
     def end(self) -> int:
@@ -57,7 +58,7 @@ class LocatedMapping:
 
     @property
     def start(self) -> int:
-        return 0 if self.node is None else int(self.node.start_mark.index)
+        return 0 if self.node is None else content_start(self.file.text, self.node)
 
     @property
     def end(self) -> int:
@@ -85,7 +86,7 @@ class LocatedSequence:
 
     @property
     def start(self) -> int:
-        return int(self.node.start_mark.index)
+        return content_start(self.file.text, self.node)
 
     @property
     def end(self) -> int:
@@ -124,3 +125,22 @@ def written_as(node: Located) -> "Located | None":
     if node.include_site is not None:
         return node.include_site
     return node.included_by
+
+
+# --- Anchors and aliases (step 6) ----------------------------------------------------------
+
+
+def is_alias(node: Located) -> TypeGuard[LocatedScalar | LocatedMapping | LocatedSequence]:
+    """Whether `node` is an alias (`*name`) as written."""
+    return alias_name(node) is not None
+
+
+def alias_name(node: Located) -> str | None:
+    """The anchor name when `node` is an alias (`*name`) as written, else None."""
+    name: str | None = getattr(getattr(node, "node", None), ALIAS_NAME, None)
+    return name
+
+
+def alias_target(node: Located) -> Any:
+    """The anchored composed node an alias refers to (only when `alias_name(node)` is set)."""
+    return getattr(node.node, ALIAS_TARGET) if not isinstance(node, TextInclude) else None

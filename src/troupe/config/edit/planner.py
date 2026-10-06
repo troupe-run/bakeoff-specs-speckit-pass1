@@ -27,6 +27,7 @@ from troupe.config.tree import (
     LocatedScalar,
     LocatedSequence,
     TextInclude,
+    is_alias,
     written_as,
 )
 from troupe.errors import PathError, WriteRefused
@@ -48,6 +49,9 @@ class EditPlan:
     # Override writes are expected only where their include reference is, not wherever the
     # included file appears (research O-6).
     by_site: bool = False
+    # The configuration the plan was made on, when not the one on disk: `--expand-alias` plans
+    # the set on the expanded text (step 6).
+    basis: Loaded | None = None
 
 
 @dataclass
@@ -58,12 +62,23 @@ class _Owner:
     key: LocatedScalar | None = None
 
 
+MERGE_KEY = "<<"
+
+
 def plan_set(
-    loaded: Loaded, path: ConfigPath, value: NewNode, *, in_include: bool = False
+    loaded: Loaded,
+    path: ConfigPath,
+    value: NewNode,
+    *,
+    in_include: bool = False,
+    expand_alias: bool = False,
 ) -> EditPlan | None:
     """Plan `set PATH VALUE`; None when the value is already what was asked (nothing to do)."""
+    from troupe.config.edit.alias import through_alias
     from troupe.config.edit.override import Walk, place_new_key
 
+    if MERGE_KEY in path.segments:
+        raise WriteRefused(f"{path}: troupe never writes a merge key ({MERGE_KEY})")
     node: Located = loaded.root
     owner: _Owner | None = None
     walk = Walk()
@@ -97,6 +112,11 @@ def plan_set(
         else:
             raise PathError(f"{here}: its parent is a scalar, not a mapping or list")
         walk.enter(node, here)
+        if is_alias(node) and depth < len(path.segments) - 1:
+            # Below an alias is the anchored node, shared by every alias (step 6).
+            return through_alias(
+                loaded, node, owner, path, value, in_include=in_include, expand=expand_alias
+            )
     assert owner is not None
     return _replace(loaded, node, owner, value, path)
 
@@ -344,7 +364,10 @@ def _replace(
     if _same(target, expected):
         return None
     ctx = _context(loaded, target.file, path)
-    if isinstance(target, LocatedScalar):
+    if is_alias(target):
+        # The alias itself is replaced: only its `*name` changes, the anchor stays (step 6).
+        _replace_alias(ctx, target, owner, value)
+    elif isinstance(target, LocatedScalar):
         _replace_scalar(ctx, target, owner, value)
     else:
         _replace_collection(ctx, target, owner, value)
@@ -388,6 +411,32 @@ def _replace_text_include(
     return EditPlan(target.target, text, target, path, (), text)
 
 
+def _replace_alias(
+    ctx: _Context,
+    target: LocatedScalar | LocatedMapping | LocatedSequence,
+    owner: _Owner,
+    value: NewNode,
+) -> None:
+    if target.in_flow:
+        ctx.inline(target.start, target.end, _flow_text(value, None))
+        return
+    line = ctx.lines.index_of(target.end)
+    _write_value(ctx, owner, _owner_column(ctx, owner), target.start, target.end, line, "", value)
+
+
+def _after_properties(ctx: _Context, offset: int) -> int:
+    """`offset` (just after a `:` or `-`), moved past an `&anchor` that follows it on its line."""
+    text = ctx.text
+    probe = offset
+    while probe < len(text) and text[probe] in " \t":
+        probe += 1
+    if not text.startswith("&", probe):
+        return offset
+    while probe < len(text) and text[probe] not in " \t\r\n":
+        probe += 1
+    return probe
+
+
 def _replace_scalar(ctx: _Context, target: LocatedScalar, owner: _Owner, value: NewNode) -> None:
     owner_column = _owner_column(ctx, owner)
     if target.in_flow:
@@ -398,11 +447,30 @@ def _replace_scalar(ctx: _Context, target: LocatedScalar, owner: _Owner, value: 
         return
     empty = target.style is None and target.node.value == ""
     # An empty value's end mark points at the next token; its real span is just after the
-    # `:` or `-`.
-    start = _after_indicator(ctx, owner, target.start) if empty else target.start
+    # `:` or `-` (and the anchor, if any).
+    start = (
+        _after_properties(ctx, _after_indicator(ctx, owner, target.start))
+        if empty
+        else target.start
+    )
     end = start if empty else target.end
     lead = " " if empty else ""
     line = ctx.lines.index_of(end)
+    _write_value(ctx, owner, owner_column, start, end, line, lead, value, target.style)
+
+
+def _write_value(
+    ctx: _Context,
+    owner: _Owner,
+    owner_column: int,
+    start: int,
+    end: int,
+    line: int,
+    lead: str,
+    value: NewNode,
+    style: str | None = None,
+) -> None:
+    """Write `value` over the inline text start..end in block context."""
     if isinstance(value, NewScalar):
         text_value = value.value
         if (
@@ -414,7 +482,7 @@ def _replace_scalar(ctx: _Context, target: LocatedScalar, owner: _Owner, value: 
             ctx.inline(start, end, lead + header)
             ctx.insert_after_line(line, lines)
             return
-        ctx.inline(start, end, lead + render.render_inline(value, target.style, in_flow=False))
+        ctx.inline(start, end, lead + render.render_inline(value, style, in_flow=False))
         return
     if render.is_empty_collection(value):
         ctx.inline(start, end, lead + render.render_flow(value))
@@ -427,7 +495,7 @@ def _scalar_to_block_collection(
 ) -> None:
     """FR-035 / research B-3: the key's line keeps its bytes up to its end-of-line comment."""
     if owner.key is not None:
-        after_colon = _after_indicator(ctx, owner, start)
+        after_colon = _after_properties(ctx, _after_indicator(ctx, owner, start))
         ctx.inline(after_colon, end, "")
         ctx.insert_after_line(line, render.render_block(value, owner_column + ctx.step, ctx.step))
         return
@@ -481,7 +549,7 @@ def _replace_block_scalar(
     elif render.is_empty_collection(value):
         ctx.inline(block.header_start, block.header_end, render.render_flow(value))
     elif owner.key is not None:
-        after_colon = _after_indicator(ctx, owner, target.start)
+        after_colon = _after_properties(ctx, _after_indicator(ctx, owner, target.start))
         ctx.inline(after_colon, block.header_end, "")
         ctx.insert_after_line(
             block.header_line, render.render_block(value, owner_column + ctx.step, ctx.step)
@@ -555,7 +623,7 @@ def _replace_collection(
         joined = ctx.eol.join([header, *lines])
         ctx.splices.append((target.start, ctx.lines[last_line].end, joined))
         return
-    after = _after_indicator(ctx, owner, target.start)
+    after = _after_properties(ctx, _after_indicator(ctx, owner, target.start))
     ctx.inline(after, after, " " + header)
     ctx.replace_lines(first_line, last_line, lines)
 

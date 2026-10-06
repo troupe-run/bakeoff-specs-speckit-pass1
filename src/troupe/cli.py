@@ -44,6 +44,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="write a new key into the included file instead of as an override",
     )
+    set_parser.add_argument(
+        "--expand-alias",
+        action="store_true",
+        help="replace a YAML alias on PATH with its own copy of the anchored value first",
+    )
     add("history", "list configuration changes as JSON Lines").add_argument(
         "path", metavar="PATH", nargs="?"
     )
@@ -91,6 +96,7 @@ def run(argv: Sequence[str]) -> str:
             actor=actor,
             reason=args.reason,
             in_include=args.in_include,
+            expand_alias=args.expand_alias,
         )
     return commands.history(theatre, args.path)
 

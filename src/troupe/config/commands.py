@@ -125,6 +125,7 @@ def set_value(
     reason: str | None,
     *,
     in_include: bool = False,
+    expand_alias: bool = False,
 ) -> str:
     path = ConfigPath.parse(path_text)
     value = parse_value(value_text)
@@ -133,7 +134,13 @@ def set_value(
     with theatre_lock(theatre):
         loaded, store = open_theatre(theatre, reconcile=True)
         events = apply_set(
-            theatre, loaded, path, value, before_write=store.check_writable, in_include=in_include
+            theatre,
+            loaded,
+            path,
+            value,
+            before_write=store.check_writable,
+            in_include=in_include,
+            expand_alias=expand_alias,
         )
         # Begun after open_theatre, so any import or reconcile above is a unit of its own with
         # its own change and at, and is never credited to this command's actor (spec D-30).
