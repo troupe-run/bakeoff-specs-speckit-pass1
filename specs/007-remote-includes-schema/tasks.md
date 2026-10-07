@@ -363,3 +363,9 @@ exits 3 with no change.
   - The `--include` tag-removal approach from T030.
   - The `FetchError` distinction from T029.
   - Per Constitution VI and plan: research decisions (unrequested)
+
+---
+
+## Phase 10: Convergence
+
+- [ ] T033 CRITICAL: make the spec agree with the tests. Amend SC-606 in `specs/007-remote-includes-schema/spec.md`: step 1–6 tests pass unchanged when no schema exists and no fixture string starts with `https://` or `http://`, except tests whose `set` VALUE is an include string. FR-640 now writes those `!literal` unless `--include` is given, so those tests pass `--include` (the five tests in `tests/e2e/test_set_includes.py`; see research U-13). Add a note under step 1's set requirements in `specs/001-config-load-show-set/spec.md` pointing to FR-640. Per Constitution VI and SC-606 (contradicts)
