@@ -22,7 +22,14 @@ from troupe.config.files import CRLF, LF, SourceFile
 from troupe.config.includes import LITERAL_TAG, include_ref
 from troupe.config.loader import Loaded
 from troupe.config.paths import ConfigPath, is_index
-from troupe.config.scalars import NewNode, NewScalar, Value, plain_value, scalars_equal
+from troupe.config.scalars import (
+    NewNode,
+    NewScalar,
+    Value,
+    literal_tag_end,
+    plain_value,
+    scalars_equal,
+)
 from troupe.config.tree import (
     Located,
     LocatedMapping,
@@ -443,16 +450,22 @@ def _replace_alias(
 
 
 def _after_properties(ctx: _Context, offset: int) -> int:
-    """`offset` (just after a `:` or `-`), moved past an `&anchor` that follows it on its line."""
+    """`offset` (just after a `:` or `-`), moved past an `&anchor` and a `!literal` tag (step 7
+    FR-644) that follow it on its line, in either order."""
     text = ctx.text
-    probe = offset
-    while probe < len(text) and text[probe] in " \t":
-        probe += 1
-    if not text.startswith("&", probe):
-        return offset
-    while probe < len(text) and text[probe] not in " \t\r\n":
-        probe += 1
-    return probe
+    end = offset
+    while True:
+        probe = end
+        while probe < len(text) and text[probe] in " \t":
+            probe += 1
+        if text.startswith("&", probe):
+            while probe < len(text) and text[probe] not in " \t\r\n":
+                probe += 1
+            end = probe
+        elif literal_tag_end(text, probe) is not None:
+            end = probe + len(LITERAL_TAG)
+        else:
+            return end
 
 
 def _literal_tag(
@@ -465,10 +478,6 @@ def _literal_tag(
         return value, None
     if not (include and include_ref(value.value) is not None):
         return dc_replace(value, tag=None), None
-    if target.style in (render.LITERAL, render.FOLDED) or target.node.value == "":
-        raise WriteRefused(
-            f"{path}: remove the {LITERAL_TAG} tag in {ctx.file.path} by hand to make it an include"
-        )
     return value, ctx.text.rfind(LITERAL_TAG, 0, target.start)
 
 
@@ -485,20 +494,20 @@ def _replace_scalar(
         ctx.inline(start, target.end, _flow_text(value, target.style))
         return
     if target.style in (render.LITERAL, render.FOLDED):
-        _replace_block_scalar(ctx, target, owner, owner_column, value)
+        _replace_block_scalar(ctx, target, owner, owner_column, value, untag_from)
         return
     empty = target.style is None and target.node.value == ""
-    # An empty value's end mark points at the next token; its real span is just after the
-    # `:` or `-` (and the anchor, if any).
-    start = (
-        _after_properties(ctx, _after_indicator(ctx, owner, target.start))
-        if empty
-        else target.start
-        if untag_from is None
-        else untag_from
-    )
-    end = start if empty else target.end
-    lead = " " if empty else ""
+    if empty and untag_from is not None:
+        # `key: !literal` with `--include`: the tag itself is replaced by the value.
+        start, end, lead = untag_from, untag_from + len(LITERAL_TAG), ""
+    elif empty:
+        # An empty value's end mark points at the next token; its real span is just after the
+        # `:` or `-` (and the anchor and `!literal` tag, if any).
+        start = _after_properties(ctx, _after_indicator(ctx, owner, target.start))
+        end, lead = start, " "
+    else:
+        start = target.start if untag_from is None else untag_from
+        end, lead = target.end, ""
     line = ctx.lines.index_of(end)
     _write_value(ctx, owner, owner_column, start, end, line, lead, value, target.style)
 
@@ -550,9 +559,16 @@ def _scalar_to_block_collection(
 
 
 def _replace_block_scalar(
-    ctx: _Context, target: LocatedScalar, owner: _Owner, owner_column: int, value: NewNode
+    ctx: _Context,
+    target: LocatedScalar,
+    owner: _Owner,
+    owner_column: int,
+    value: NewNode,
+    untag_from: int | None = None,
 ) -> None:
+    """`untag_from`: where a `!literal` tag that `--include` removes starts (step 7 FR-644)."""
     block = _block_scalar(ctx, target, owner_column)
+    header_start = block.header_start if untag_from is None else untag_from
     text_value = value.value if isinstance(value, NewScalar) else None
     if isinstance(text_value, str) and render.literal_representable(text_value):
         chomp = render.chomping_for(text_value, block.chomp)
@@ -581,17 +597,15 @@ def _replace_block_scalar(
         header = block.indicator + digit + chomp
         if isinstance(value, NewScalar) and value.tag:
             header = render.tagged(value, header)
-        if header != ctx.text[block.header_start : block.header_end]:
-            ctx.inline(block.header_start, block.header_end, header)
+        if header != ctx.text[header_start : block.header_end]:
+            ctx.inline(header_start, block.header_end, header)
         last = block.last_block if "+" in (block.chomp, chomp) else block.last_text
         _replace_content(ctx, block, last, new_lines)
         return
     # The value is no longer a block scalar: write it inline and drop the old content lines.
     _replace_content(ctx, block, block.last_text, [])
     if isinstance(value, NewScalar):
-        ctx.inline(
-            block.header_start, block.header_end, render.render_inline(value, None, in_flow=False)
-        )
+        ctx.inline(header_start, block.header_end, render.render_inline(value, None, in_flow=False))
     elif render.is_empty_collection(value):
         ctx.inline(block.header_start, block.header_end, render.render_flow(value))
     elif owner.key is not None:

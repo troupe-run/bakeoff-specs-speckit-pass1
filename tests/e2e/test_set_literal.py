@@ -140,3 +140,34 @@ def test_expanding_an_alias_keeps_a_literal_tag(theatre: Theatre) -> None:
     )
     assert_set(theatre, {"troupe.yml": text}, "e.m", "2", {"troupe.yml": expected},
                options=("--expand-alias",))  # fmt: skip
+
+
+def test_include_flag_removes_a_tag_on_a_literal_block(theatre: Theatre, web: Web) -> None:
+    web.write("d.md", "Guide\n")
+    url = web.url("d.md")
+    assert_set(theatre, {"troupe.yml": "a: !literal |\n  old\n  text\nb: 1\n"}, "a", url,
+               {"troupe.yml": f"a: |-\n  {url}\nb: 1\n"}, options=("--include",))  # fmt: skip
+    # The block keeps its indicator (step 1 FR-030); its content is the include string.
+    assert theatre.config("get", "a").out == "Guide\n"
+
+
+def test_include_flag_removes_a_tag_on_an_empty_value(theatre: Theatre, web: Web) -> None:
+    web.write("d.md", "Guide\n")
+    url = web.url("d.md")
+    assert_set(theatre, {"troupe.yml": "a: &k !literal\nb: 1\n"}, "a", url,
+               {"troupe.yml": f"a: &k {url}\nb: 1\n"}, options=("--include",))  # fmt: skip
+
+
+def test_an_empty_tagged_value_keeps_its_tag(theatre: Theatre) -> None:
+    assert_set(theatre, {"troupe.yml": "a: !literal\nb: 1\n"}, "a", URL,
+               {"troupe.yml": f"a: !literal {URL}\nb: 1\n"})  # fmt: skip
+
+
+def test_an_empty_anchored_tagged_value_keeps_both(theatre: Theatre) -> None:
+    assert_set(theatre, {"troupe.yml": "a: &k !literal\nb: 1\n"}, "a", "x",
+               {"troupe.yml": "a: &k !literal x\nb: 1\n"})  # fmt: skip
+
+
+def test_a_tagged_literal_block_keeps_its_tag(theatre: Theatre) -> None:
+    assert_set(theatre, {"troupe.yml": "a: !literal |\n  old\n"}, "a", '"https://x\\ny\\n"',
+               {"troupe.yml": "a: !literal |\n  https://x\n  y\n"})  # fmt: skip
