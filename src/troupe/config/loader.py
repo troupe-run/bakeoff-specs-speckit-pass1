@@ -1,4 +1,4 @@
-"""Load a theatre's configuration, following `file:` includes."""
+"""Load a theatre's configuration, following includes (`file:` and, from step 7, URLs)."""
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,7 +11,9 @@ from ruamel.yaml.events import AliasEvent
 from ruamel.yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
 from troupe.config.files import SourceFile, find_config, is_yaml_name, read_source
+from troupe.config.includes import LITERAL_TAG, REF_KEY, FileRef, UrlRef, include_ref
 from troupe.config.scalars import ALIAS_NAME, ALIAS_TARGET, resolve_node
+from troupe.config.schema import SubSchema, is_uri, schema_child
 from troupe.config.tree import (
     Located,
     LocatedMapping,
@@ -21,22 +23,18 @@ from troupe.config.tree import (
 )
 from troupe.errors import LoadError
 
-INCLUDE_PREFIX = "file:"
-REF_KEY = "$ref"  # the key of a mapping-form include (spec FR-400)
-
-
-def include_target(value: object) -> str | None:
-    """The include path named by a string value, or None if the value is not an include."""
-    if isinstance(value, str) and value.startswith(INCLUDE_PREFIX):
-        return value[len(INCLUDE_PREFIX) :]
-    return None
+type Chain = tuple[Path | str, ...]
+"""The sources on the way to a node: resolved paths, and URLs as written."""
 
 
 @dataclass
 class Loaded:
     root: LocatedMapping
+    # Local files only: what `watch` reads back (step 7 D-65).
     files: dict[Path, SourceFile] = field(default_factory=dict)
-    composed: dict[Path, Any] = field(default_factory=dict)
+    composed: dict[Path | str, Any] = field(default_factory=dict)
+    # Fetched documents by URL, reused by a command's re-checks (spec D-62, research U-3).
+    remote: dict[str, SourceFile] = field(default_factory=dict)
 
 
 class _AliasComposer(Composer):
@@ -96,11 +94,14 @@ def compose(source: SourceFile) -> Any:
 
 
 class _Loader:
-    def __init__(self, overrides: dict[Path, str]) -> None:
+    def __init__(
+        self, overrides: dict[Path, str], fetched: dict[str, SourceFile], schema: SubSchema
+    ) -> None:
         self.overrides = overrides
-        self.loaded: Loaded | None = None
         self.files: dict[Path, SourceFile] = {}
-        self.composed: dict[Path, Any] = {}
+        self.composed: dict[Path | str, Any] = {}
+        self.fetched = dict(fetched)
+        self.schema = schema
 
     def source(self, path: Path) -> SourceFile:
         key = path.resolve()
@@ -118,38 +119,57 @@ class _Loader:
         return self.composed[source.path]
 
     def load(self, main: Path) -> Loaded:
+        main = main.resolve()
         source = self.source(main)
         node = self.composed_root(source)
         if node is None:
             root = LocatedMapping(source, None, in_flow=False)
         elif isinstance(node, MappingNode):
-            located = self.build(node, source, False, (source.path,))
+            located = self.build(node, source, False, (main,), self.schema)
             assert isinstance(located, LocatedMapping)
             root = located
         else:
             raise LoadError(f"{source.path}: the top level must be a mapping")
-        return Loaded(root, self.files, self.composed)
+        return Loaded(root, self.files, self.composed, self.fetched)
+
+    def is_include(self, scalar: LocatedScalar, sub: SubSchema) -> FileRef | UrlRef | None:
+        """What `scalar` includes, or None when it is not an include: not an include string, or
+        a literal — tagged `!literal`, or `format: uri` in its subschema `sub` (spec FR-620)."""
+        if scalar.node.tag == LITERAL_TAG or is_uri(sub):
+            return None
+        ref = include_ref(scalar.value)
+        return ref if isinstance(ref, FileRef) else None
 
     def build(
         self,
         node: Node,
         source: SourceFile,
         in_flow: bool,
-        chain: tuple[Path, ...],
+        chain: Chain,
+        sub: SubSchema,
         follow: bool = True,
     ) -> Located:
-        """Build the located tree for `node`; `follow=False` keeps a `file:` string unfollowed
-        (the value of `$ref`, which the enclosing mapping includes itself)."""
+        """Build the located tree for `node`, whose subschema is `sub`; `follow=False` keeps an
+        include string unfollowed (the value of `$ref`, which the enclosing mapping includes
+        itself)."""
         if isinstance(node, ScalarNode):
             scalar = LocatedScalar(resolve_node(node, source.text), source, node, in_flow)
-            target = include_target(scalar.value)
-            if target is None or not follow:
+            included = self.is_include(scalar, sub)
+            if included is None or not follow:
                 return scalar
-            return self.include(scalar, target, chain)
+            return self.include(scalar, included, chain, sub)
+        if node.tag == LITERAL_TAG:
+            raise LoadError(
+                f"{source.path}: line {node.start_mark.line + 1}: {LITERAL_TAG} applies to a "
+                "single value, not a mapping or list"
+            )
         if isinstance(node, SequenceNode):
             flow = in_flow or bool(node.flow_style)
             sequence = LocatedSequence(source, node, in_flow)
-            sequence.items = [self.build(item, source, flow, chain) for item in node.value]
+            sequence.items = [
+                self.build(item, source, flow, chain, schema_child(sub, index))
+                for index, item in enumerate(node.value)
+            ]
             return sequence
         if isinstance(node, MappingNode):
             flow = in_flow or bool(node.flow_style)
@@ -159,27 +179,31 @@ class _Loader:
                 if not isinstance(key_node, ScalarNode):
                     raise LoadError(f"{source.path}: only scalar mapping keys are supported")
                 key = LocatedScalar(resolve_node(key_node, source.text), source, key_node, flow)
-                value = self.build(value_node, source, flow, chain, follow=key.value != REF_KEY)
+                is_ref = key.value == REF_KEY
+                # `$ref` is not part of the configuration, so it has no subschema.
+                child = None if is_ref else schema_child(sub, str(key.node.value))
+                value = self.build(value_node, source, flow, chain, child, follow=not is_ref)
                 if (
-                    key.value == REF_KEY
+                    is_ref
                     and isinstance(value, LocatedScalar)
-                    and include_target(value.value) is not None
+                    and self.is_include(value, None) is not None
                 ):
                     ref = value
                 mapping.entries.append((key, value))
             if ref is None:
                 return mapping  # no `$ref`, or one that is not an include string (spec D-42)
-            return self.mapping_include(mapping, ref, chain)
+            return self.mapping_include(mapping, ref, chain, sub)
         raise LoadError(f"{source.path}: unsupported YAML node")
 
     def mapping_include(
-        self, raw: LocatedMapping, ref: LocatedScalar, chain: tuple[Path, ...]
+        self, raw: LocatedMapping, ref: LocatedScalar, chain: Chain, sub: SubSchema
     ) -> Located:
         """A mapping-form include: the included content deep-merged with the overrides (spec
-        FR-400 to FR-403, D-43; research O-3). `raw` is the mapping as written, `$ref` included."""
-        target = include_target(ref.value)
+        FR-400 to FR-403, D-43; research O-3). `raw` is the mapping as written, `$ref` included;
+        the content fills the mapping's place, so it has the mapping's subschema `sub`."""
+        target = self.is_include(ref, None)
         assert target is not None
-        content = self.include(ref, target, chain)
+        content = self.include(ref, target, chain, sub)
         overrides = [(key, value) for key, value in raw.entries if value is not ref]
         if isinstance(content, TextInclude):
             if overrides:
@@ -202,20 +226,36 @@ class _Loader:
         merged.include_site = raw
         return merged
 
-    def include(self, scalar: LocatedScalar, target: str, chain: tuple[Path, ...]) -> Located:
-        path = (scalar.file.path.parent / target).resolve()
+    def include(
+        self, scalar: LocatedScalar, ref: FileRef | UrlRef, chain: Chain, sub: SubSchema
+    ) -> Located:
+        """The content `scalar` includes, at a place whose subschema is `sub`."""
+        if isinstance(ref, UrlRef):
+            raise AssertionError("URL includes are followed from step 7 US1")
+        if isinstance(scalar.file.path, str):
+            # Remote content may not reach into the user's disk (spec D-61).
+            raise LoadError(
+                f"{scalar.file.path}: the file: include {scalar.value!r} in remote content is "
+                "not allowed"
+            )
+        path = (scalar.file.path.parent / ref.path).resolve()
         if path in chain:
             raise LoadError(f"{scalar.file.path}: include cycle through {path}")
         if not path.exists():
             raise LoadError(f"{scalar.file.path}: included file {path} not found")
-        source = self.source(path)
+        return self.embed(scalar, self.source(path), (*chain, path), sub)
+
+    def embed(
+        self, scalar: LocatedScalar, source: SourceFile, chain: Chain, sub: SubSchema
+    ) -> Located:
+        """`source`'s content in place of the include string `scalar`."""
         if source.kind == "text":
             return TextInclude(scalar, source)
         node = self.composed_root(source)
         if node is None:
             # An empty YAML file embeds as null; its span is the (empty) file itself.
             node = ScalarNode("tag:yaml.org,2002:null", "", _Mark(0), _Mark(0))
-        embedded = self.build(node, source, False, (*chain, path))
+        embedded = self.build(node, source, False, chain, sub)
         embedded.included_by = scalar
         return embedded
 
@@ -255,10 +295,18 @@ class _Mark:
 
 
 def reload(loaded: Loaded, overrides: dict[Path, str]) -> Loaded:
-    """Load the same configuration again, with `overrides` substituting file texts."""
-    return _Loader(overrides).load(loaded.root.file.path)
+    """Load the same configuration again, with `overrides` substituting file texts and the
+    documents `loaded` fetched reused (spec D-62)."""
+    main = loaded.root.file.path
+    assert isinstance(main, Path)
+    return _Loader(overrides, loaded.remote, None).load(main)
 
 
-def load(theatre: Path, overrides: dict[Path, str] | None = None) -> Loaded:
-    """Load the theatre's configuration. `overrides` substitutes file texts (by resolved path)."""
-    return _Loader(overrides or {}).load(find_config(theatre))
+def load(
+    theatre: Path,
+    overrides: dict[Path, str] | None = None,
+    fetched: dict[str, SourceFile] | None = None,
+) -> Loaded:
+    """Load the theatre's configuration. `overrides` substitutes file texts (by resolved path);
+    `fetched` supplies documents already fetched by this command (by URL, spec D-62)."""
+    return _Loader(overrides or {}, fetched or {}, None).load(find_config(theatre))

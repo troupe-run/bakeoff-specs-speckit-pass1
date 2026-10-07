@@ -7,6 +7,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from troupe.errors import LoadError, WriteRefused
 
@@ -20,6 +21,12 @@ LF = "\n"
 def is_yaml_name(path: Path) -> bool:
     """Include targets with these suffixes are embedded as YAML; others are text."""
     return path.name.endswith(YAML_SUFFIXES)
+
+
+def is_yaml_url(url: str) -> bool:
+    """A fetched document is YAML when its URL's path (no query or fragment) ends as a YAML file
+    name does (spec FR-601); otherwise it is text."""
+    return urlsplit(url).path.endswith(YAML_SUFFIXES)
 
 
 def find_config(theatre: Path) -> Path:
@@ -42,7 +49,9 @@ def detect_newline(text: str) -> str:
 
 @dataclass(eq=False)
 class SourceFile:
-    path: Path
+    """A file's text; `path` is a URL string, exactly as written, for a fetched document."""
+
+    path: Path | str
     text: str
     kind: Literal["yaml", "text"]
 
@@ -66,6 +75,23 @@ def read_source(path: Path) -> SourceFile:
     except UnicodeDecodeError:
         raise LoadError(f"{path}: not valid UTF-8") from None
     return SourceFile(path, text, "yaml" if is_yaml_name(path) else "text")
+
+
+class RemoteSource(WriteRefused):
+    """A write into fetched content: refused, since troupe cannot change it (spec FR-610). The
+    caller, which knows PATH, says which include line to change instead (research U-7)."""
+
+    def __init__(self, url: str) -> None:
+        super().__init__(f"{url}: remote content is read-only; no file was changed")
+        self.url = url
+
+
+def local_path(source: SourceFile) -> Path:
+    """The path to write `source` at. Every write goes through here; remote content is
+    read-only (spec FR-610, research U-2)."""
+    if isinstance(source.path, str):
+        raise RemoteSource(source.path)
+    return source.path
 
 
 def check_writable(path: Path) -> None:

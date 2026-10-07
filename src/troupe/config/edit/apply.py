@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from troupe.config.edit.planner import EditPlan, plan_set
-from troupe.config.files import atomic_write, check_writable
+from troupe.config.files import atomic_write, check_writable, local_path
 from troupe.config.leaves import LeafEvent, diff_events, leaves, to_value, written_value
 from troupe.config.loader import Loaded, load
 from troupe.config.paths import ConfigPath, dotted_is_within
@@ -38,19 +38,23 @@ def apply_set(
     plan = plan_set(loaded, path, value, in_include=in_include, expand_alias=expand_alias)
     if plan is None or plan.new_text == plan.file.text:
         return []
+    target = local_path(plan.file)
     before = leaves(loaded.root)
-    after_loaded = _reload(theatre, plan, path)
+    after_loaded = _reload(theatre, loaded, target, plan, path)
     after = leaves(after_loaded.root)
     _verify(loaded, after_loaded, plan, path, before, after)
-    check_writable(plan.file.path)
+    check_writable(target)
     before_write()
-    atomic_write(plan.file.path, plan.new_text)
+    atomic_write(target, plan.new_text)
     return diff_events(before, after)
 
 
-def _reload(theatre: Path, plan: EditPlan, path: ConfigPath) -> Loaded:
+def _reload(
+    theatre: Path, loaded: Loaded, target: Path, plan: EditPlan, path: ConfigPath
+) -> Loaded:
     try:
-        return load(theatre, {plan.file.path: plan.new_text})
+        # The same fetched documents: a command sees one remote content (spec D-62).
+        return load(theatre, {target: plan.new_text}, loaded.remote)
     except LoadError as error:
         raise WriteRefused(
             f"{path}: the change to {plan.file.path} would not load back ({error.message}); "
@@ -101,7 +105,7 @@ def _join(alias: str, rest: tuple[str, ...]) -> str:
     return ".".join(part for part in (alias, *rest) if part)
 
 
-def _identity(node: Located) -> tuple[Path, str, int]:
+def _identity(node: Located) -> tuple[Path | str, str, int]:
     """A YAML alias has its anchor's identity: it shows the same bytes (step 6)."""
     if isinstance(node, TextInclude):
         return node.target.path, "text", 0
@@ -114,7 +118,7 @@ def _identity(node: Located) -> tuple[Path, str, int]:
     return node.file.path, type(node).__name__, node.start if node.node is not None else -1
 
 
-def _site_identity(node: Located) -> tuple[Path, str, int]:
+def _site_identity(node: Located) -> tuple[Path | str, str, int]:
     """An include root identified by its reference in the including file (research O-6)."""
     written = written_as(node)
     return _identity(written if written is not None else node)

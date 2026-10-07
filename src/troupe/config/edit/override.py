@@ -15,7 +15,8 @@ from ruamel.yaml.nodes import MappingNode, Node, SequenceNode
 
 from troupe.config.edit import render
 from troupe.config.edit.planner import EditPlan, _context, _new_key
-from troupe.config.loader import REF_KEY, Loaded
+from troupe.config.includes import REF_KEY
+from troupe.config.loader import Loaded
 from troupe.config.paths import ConfigPath
 from troupe.config.scalars import NewNode, plain_value
 from troupe.config.tree import (
@@ -39,7 +40,7 @@ class Walk:
     its overrides.
     """
 
-    sites: dict[Path, tuple[Located, ConfigPath]] = field(default_factory=dict)
+    sites: dict[Path | str, tuple[Located, ConfigPath]] = field(default_factory=dict)
     merged_root: tuple[LocatedMapping, ConfigPath] | None = None
 
     def enter_item(self) -> None:
@@ -58,7 +59,7 @@ class Walk:
             current = current.base if isinstance(current, LocatedMapping) else None
 
 
-def _target_file(node: Located) -> Path:
+def _target_file(node: Located) -> Path | str:
     return node.target.path if isinstance(node, TextInclude) else node.file.path
 
 

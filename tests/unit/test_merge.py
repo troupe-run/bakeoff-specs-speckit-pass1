@@ -30,7 +30,7 @@ def at(loaded: Loaded, path: str) -> Located:
 def file_of(loaded: Loaded, path: str) -> str:
     node = at(loaded, path)
     assert isinstance(node, LocatedScalar)
-    return node.file.path.name
+    return Path(node.file.path).name
 
 
 def keys(node: Located) -> list[str]:
@@ -101,7 +101,7 @@ def test_merged_nodes_remember_site_and_overrides(tmp_path: Path) -> None:
     assert isinstance(root, LocatedMapping)
     assert root.included_by is not None and root.included_by.value == "file:c.yaml"
     site = root.include_site
-    assert site is not None and site.file.path.name == "troupe.yml"
+    assert site is not None and Path(site.file.path).name == "troupe.yml"
     assert keys(site) == ["$ref", "limits"]
     assert root.overrides is site
     limits = at(loaded, "coder.limits")
@@ -115,7 +115,7 @@ def test_merged_mapping_keeps_its_base(tmp_path: Path) -> None:
     root = at(loaded, "coder")
     assert isinstance(root, LocatedMapping) and root.base is not None
     assert keys(root.base) == ["a", "b", "limits", "tools"]
-    assert {key.file.path.name for key, _ in root.base.entries} == {"c.yaml"}
+    assert {Path(key.file.path).name for key, _ in root.base.entries} == {"c.yaml"}
 
 
 def test_shared_part_follows_nested_bases(tmp_path: Path) -> None:
@@ -126,5 +126,5 @@ def test_shared_part_follows_nested_bases(tmp_path: Path) -> None:
     model = at(load(tmp_path), "coder.model")
     assert isinstance(model, LocatedMapping)
     shared = shared_part(model)
-    assert shared.file.path.name == "m.yaml"
+    assert Path(shared.file.path).name == "m.yaml"
     assert keys(shared) == ["a"]

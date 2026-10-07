@@ -17,6 +17,7 @@ from troupe.config.edit.planner import (
     _owner_column,
     plan_set,
 )
+from troupe.config.files import local_path
 from troupe.config.leaves import written_value
 from troupe.config.loader import Loaded, reload
 from troupe.config.paths import ConfigPath
@@ -58,9 +59,10 @@ def through_alias(
         raise WriteRefused(
             f"{path}: &{name} holds a merge key ({MERGE_KEY}); troupe never writes one"
         )
+    target = local_path(alias.file)
     expanded = _expand(loaded, alias, owner, name, copy, path)
     try:
-        basis = reload(loaded, {alias.file.path: expanded})
+        basis = reload(loaded, {target: expanded})
     except LoadError as error:
         raise WriteRefused(
             f"{path}: expanding *{name} in {alias.file.path} would not load back "

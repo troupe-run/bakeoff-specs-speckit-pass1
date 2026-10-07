@@ -4,11 +4,14 @@ import json
 import os
 import shutil
 import signal
+import socket
+import ssl
 import subprocess
 import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import IO, Any
 
@@ -18,7 +21,20 @@ from troupe.config.store import STORE_FILENAME, ConfigStore
 
 TROUPE = shutil.which("troupe")
 # Inherited variables that would let the developer's shell decide a test's outcome.
-INHERITED_ENV_DROPPED = ("TROUPE_THEATRE", "TROUPE_ACTOR")
+# Proxy variables would route the fixture web server's requests elsewhere (research U-11).
+INHERITED_ENV_DROPPED = (
+    "TROUPE_THEATRE",
+    "TROUPE_ACTOR",
+    "http_proxy",
+    "https_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "all_proxy",
+    "NO_PROXY",
+    "no_proxy",
+    "SSL_CERT_FILE",
+)
 # The login name every test runs under, unless it overrides LOGNAME (`getpass.getuser()` reads
 # LOGNAME first; research L-6).
 TEST_LOGIN = "troupe-tester"
@@ -108,6 +124,142 @@ class Result:
 @pytest.fixture
 def theatre(tmp_path: Path) -> Theatre:
     return Theatre(tmp_path / "theatre")
+
+
+# A real web server for remote includes (step 7, research U-11).
+
+STALL_SECONDS = 15.0  # longer than troupe's 10-second fetch limit (spec D-63)
+
+
+class Web:
+    """Serves files from a directory over real HTTP (or HTTPS), recording every request.
+
+    Special paths: `/status/<code>` answers that status; `/redirect/<rel>` answers 302 to
+    `/<rel>`; `/stall` answers only after STALL_SECONDS; `/slow/<rel>` sends `<rel>` one byte a
+    second.
+    """
+
+    def __init__(self, root: Path, context: ssl.SSLContext | None = None) -> None:
+        self.root = root
+        root.mkdir(parents=True, exist_ok=True)
+        self.requests: list[str] = []
+        self.env: dict[str, str] = {}
+        web = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                web.requests.append(self.path)
+                web.answer(self)
+
+            def log_message(self, format: str, *args: Any) -> None:
+                pass
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server.daemon_threads = True
+        self.scheme = "http"
+        if context is not None:
+            self.server.socket = context.wrap_socket(self.server.socket, server_side=True)
+            self.scheme = "https"
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    @property
+    def port(self) -> int:
+        return int(self.server.server_address[1])
+
+    def url(self, rel: str) -> str:
+        return f"{self.scheme}://127.0.0.1:{self.port}/{rel}"
+
+    def write(self, rel: str, content: str | bytes) -> None:
+        path = self.root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode("utf-8") if isinstance(content, str) else content)
+
+    def answer(self, handler: BaseHTTPRequestHandler) -> None:
+        rel = handler.path.split("?", 1)[0].split("#", 1)[0].lstrip("/")
+        if rel.startswith("status/"):
+            handler.send_response(int(rel.split("/", 1)[1]))
+            handler.send_header("Content-Length", "0")
+            handler.end_headers()
+            return
+        if rel.startswith("redirect/"):
+            handler.send_response(302)
+            handler.send_header("Location", "/" + rel.split("/", 1)[1])
+            handler.send_header("Content-Length", "0")
+            handler.end_headers()
+            return
+        if rel == "stall":
+            time.sleep(STALL_SECONDS)
+        slow = rel.startswith("slow/")
+        path = self.root / (rel.split("/", 1)[1] if slow else rel)
+        if not path.is_file():
+            handler.send_response(404)
+            handler.send_header("Content-Length", "0")
+            handler.end_headers()
+            return
+        data = path.read_bytes()
+        handler.send_response(200)
+        handler.send_header("Content-Length", str(len(data)))
+        handler.end_headers()
+        try:
+            if not slow:
+                handler.wfile.write(data)
+                return
+            for byte in data:
+                handler.wfile.write(bytes([byte]))
+                handler.wfile.flush()
+                time.sleep(1.0)
+        except OSError:
+            pass  # the client gave up
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+@pytest.fixture
+def web(tmp_path: Path) -> Iterator[Web]:
+    server = Web(tmp_path / "web")
+    yield server
+    server.close()
+
+
+@pytest.fixture(scope="session")
+def tls_cert(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A self-signed certificate for 127.0.0.1, made with `openssl` (research U-11)."""
+    openssl = shutil.which("openssl")
+    if openssl is None:
+        pytest.skip("openssl is not installed; cannot make a certificate for the HTTPS server")
+    directory = tmp_path_factory.mktemp("tls")
+    subprocess.run(
+        [
+            openssl, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+            "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",
+            "-keyout", str(directory / "key.pem"), "-out", str(directory / "cert.pem"),
+        ],
+        check=True,
+        capture_output=True,
+    )  # fmt: skip
+    return directory
+
+
+@pytest.fixture
+def web_tls(tmp_path: Path, tls_cert: Path) -> Iterator[Web]:
+    """`web` over HTTPS; pass `env=web_tls.env` so the child `troupe` trusts its certificate."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(tls_cert / "cert.pem", tls_cert / "key.pem")
+    server = Web(tmp_path / "web_tls", context)
+    server.env = {"SSL_CERT_FILE": str(tls_cert / "cert.pem")}
+    yield server
+    server.close()
+
+
+def closed_port_url(rel: str) -> str:
+    """A URL on a local port nothing listens on."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    return f"http://127.0.0.1:{port}/{rel}"
 
 
 # `config watch` as a real background process (research S-9).

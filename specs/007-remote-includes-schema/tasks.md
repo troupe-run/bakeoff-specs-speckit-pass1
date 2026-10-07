@@ -46,8 +46,8 @@ Single project: `src/troupe/`, `tests/` at the repository root.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm steps 1–6 are complete and the gates are green: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`. Record the output.
-- [ ] T002 Run `uv add "jsonschema>=4.23"` (updates `pyproject.toml` and `uv.lock`; research U-12). Check that `uv run python -c "import jsonschema; jsonschema.Draft202012Validator"` succeeds. Commit with the reason: "JSON Schema 2020-12 validation for step 7; the reference implementation instead of a hand-written validator".
+- [X] T001 Confirm steps 1–6 are complete and the gates are green: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`. Record the output.
+- [X] T002 Run `uv add "jsonschema>=4.23"` (updates `pyproject.toml` and `uv.lock`; research U-12). Check that `uv run python -c "import jsonschema; jsonschema.Draft202012Validator"` succeeds. Commit with the reason: "JSON Schema 2020-12 validation for step 7; the reference implementation instead of a hand-written validator".
 
 ---
 
@@ -57,14 +57,14 @@ Single project: `src/troupe/`, `tests/` at the repository root.
 a loader that carries the subschema; a real web server for tests. No behaviour changes yet: every
 existing test stays green after each task.
 
-- [ ] T003 [P] Create `src/troupe/config/includes.py` (research U-1):
+- [X] T003 [P] Create `src/troupe/config/includes.py` (research U-1):
   - Constants: `FILE_PREFIX = "file:"`, `REMOTE_PREFIXES = ("https://", "http://")`, `LITERAL_TAG = "!literal"`, `REF_KEY = "$ref"` (moved from `loader.py`).
   - Frozen dataclasses `FileRef(path: str)` and `UrlRef(url: str)`.
   - `include_ref(value: object) -> FileRef | UrlRef | None`: a `str` starting `file:` gives `FileRef(value[5:])`; a `str` starting one of `REMOTE_PREFIXES` gives `UrlRef(value)` (exact, case-sensitive, no stripping); anything else gives `None`.
   - Module docstring: "the one place that says which strings name includes (spec FR-600, step 1 FR-010)".
   - Replace `loader.INCLUDE_PREFIX`/`include_target` and every import of `REF_KEY` (`loader.py`, `edit/override.py`) with these.
   - Write `tests/unit/test_includes.py` first: `test_file_prefix`, `test_https_and_http_prefixes`, `test_prefix_is_case_sensitive_and_exact` (`HTTPS://x`, ` https://x`, `ftp://x` all give `None`), `test_non_strings_are_never_includes` (`5`, `None`, `True`).
-- [ ] T004 [P] In `src/troupe/config/files.py` (research U-2, U-4):
+- [X] T004 [P] In `src/troupe/config/files.py` (research U-2, U-4):
   - Change `SourceFile.path` to `Path | str`. A `str` is a URL exactly as written.
   - Add `is_yaml_url(url: str) -> bool`, which returns `urlsplit(url).path.endswith(YAML_SUFFIXES)`.
   - Add `class RemoteSource(WriteRefused)` carrying `url: str`.
@@ -72,7 +72,7 @@ existing test stays green after each task.
   - Fix every mypy error the change causes. Write sites (`edit/apply.py` `check_writable`/`atomic_write`, `edit/alias.py` reload key) must call `local_path`. Reads and messages keep `.path`.
   - `Loaded.composed` and `_Loader.composed` become `dict[Path | str, Any]`. `override._target_file` returns `Path | str`.
   - Add unit tests to `tests/unit/test_includes.py`: `test_is_yaml_url_ignores_query_and_fragment` (`…/a.yaml?rev=3` → True, `…/a.yaml#x` → True, `…/a.md` → False, `…/a.YAML` → False) and `test_local_path_refuses_a_url`.
-- [ ] T005 [P] In `tests/conftest.py` (research U-11):
+- [X] T005 [P] In `tests/conftest.py` (research U-11):
   - Add `"http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"` to `INHERITED_ENV_DROPPED`.
   - Add a `Web` class and a `web` fixture: a `ThreadingHTTPServer` on `127.0.0.1:0` in a daemon thread, serving files from `tmp_path / "web"`, shut down at teardown.
     - `web.write(rel, text | bytes)` and `web.url(rel) -> str` (`http://127.0.0.1:<port>/<rel>`).
@@ -81,7 +81,7 @@ existing test stays green after each task.
   - Add a session fixture `tls_cert` that runs `openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost -addext subjectAltName=IP:127.0.0.1` into a temp directory. Skip with a clear reason if `openssl` is missing.
   - Add a `web_tls` fixture: a `Web` whose socket is wrapped with that certificate, with `url()` giving `https://127.0.0.1:<port>/…`, and `web_tls.env = {"SSL_CERT_FILE": <cert path>}` to pass to `theatre.run(..., env=…)`.
   - Add `tests/unit/test_web_fixture.py`: `test_web_serves_and_records` and `test_status_path` (via `urllib.request`), so the fixture itself is proven.
-- [ ] T006 In `src/troupe/config/loader.py` (research U-5; depends on T003, T004):
+- [X] T006 In `src/troupe/config/loader.py` (research U-5; depends on T003, T004):
   - Thread a subschema through `_Loader.build(..., sub: dict[str, Any] | None)`. A mapping entry passes `schema_child(sub, key)`, a list item `schema_child(sub, "0")`. Included content (`include`) and mapping-form overrides (`mapping_include`) pass the `sub` of the position they fill.
   - Add the module-level `schema_child(sub, segment)` to a new `src/troupe/config/schema.py`, implemented per data-model "String classification": `properties[key]` if an object, else `additionalProperties` if an object; for a digit segment, `items` if an object; otherwise `None`.
   - Add `is_uri(sub) -> bool` (`isinstance(sub, dict) and sub.get("format") == "uri"`).
