@@ -357,7 +357,7 @@ exits 3 with no change.
 - [X] T031 Name the local include line when a nested remote include fails to fetch. In `src/troupe/config/loader.py`, carry the outermost local include scalar down the chain of remote documents, so the `LoadError` from `fetch()` or from invalid YAML also says `(included through <string as written> at line N of <file>)`. Reuse `remote.as_written` and `view.source_label`, moving shared helpers to one place if an import cycle forces it.
   - Add `test_nested_fetch_failure_names_the_local_include` to `tests/e2e/test_remote_errors.py`: `troupe.yml` `x: <url>/a.yaml` and `a.yaml` `b: <url>/status/404` → exit 4, with stderr containing both URLs and `.troupe/troupe.yml`.
   - Per FR-602, FR-611 (partial)
-- [ ] T032 Record the decisions made during implementation in `specs/007-remote-includes-schema/research.md` as a new entry `U-13 Decisions made while implementing`:
+- [X] T032 Record the decisions made during implementation in `specs/007-remote-includes-schema/research.md` as a new entry `U-13 Decisions made while implementing`:
   - Alias expansion keeps `!literal` tags in the copy (`edit/alias._copy`), so the copy reads back as the same value.
   - `types-jsonschema` was added as a dev dependency for `mypy --strict`.
   - The `--include` tag-removal approach from T030.

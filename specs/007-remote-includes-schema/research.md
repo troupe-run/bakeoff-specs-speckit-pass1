@@ -202,3 +202,29 @@ Facts checked against the installed libraries before deciding:
   read-only rule, the schema file, `!literal` and `set --include`. It also warns that existing plain
   URL strings are now includes. Step 1's spec FR-010 gets a note: "Extended by step 7".
 - **Rationale**: Principles IV and VI.
+
+## U-13 Decisions made while implementing
+
+Recorded per Constitution VI; each was found during `/speckit-implement` or convergence.
+
+- **Alias expansion keeps `!literal` tags.** `set --expand-alias` writes a copy of the anchored
+  value (step 6). The copy is built from the located tree (`edit/alias._copy`), not from plain
+  values, so a tagged string is written tagged again and an include string untagged. Without this
+  a literal URL in the copy would become an include, and the re-check would refuse the `set`.
+- **`types-jsonschema` dev dependency.** `jsonschema` ships no type information. The stub
+  package keeps `mypy --strict` checking `schema.py` instead of treating the library as `Any`.
+- **Removing a tag with `--include` (FR-644).** The replaced span starts at the tag, for plain,
+  quoted, flow, block and empty scalars alike. A literal block keeps its indicator (step 1
+  FR-030), so `a: !literal |` becomes `a: |-` with the include string as its content. The same
+  work found that an empty tagged value (`a: !literal`) could not be set without `--include`.
+  `planner._after_properties` now skips a `!literal` tag as it skips an anchor, so the tag is kept
+  and the value written after it.
+- **`FetchError` and `watch`.** `fetch.FetchError` (a `LoadError`, so still exit 4) marks every
+  failure to fetch or read a remote include. That covers fetch failures and invalid YAML in
+  fetched content. `watch` reports it like a broken file but does not retry on every poll. It
+  re-reads the bytes of the files from its last successful load and fetches again only after one
+  of them (or the schema file) changes (D-65). Broken local files keep step 2's every-poll retry.
+- **Nested fetch failures name the local include.** The loader remembers, for each fetched URL,
+  the include string in a local file it is reached through. Errors fetching a URL included from
+  remote content add `(included through <string> at line N of <file>)` (FR-602). `as_written`
+  lives in `tree.py` so the loader and `remote.py` share it.
