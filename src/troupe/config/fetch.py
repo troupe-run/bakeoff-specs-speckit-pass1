@@ -16,11 +16,16 @@ FETCH_TIMEOUT = 10.0  # seconds for the whole response (spec D-63)
 _CHUNK = 64 * 1024
 
 
+class FetchError(LoadError):
+    """A remote include could not be fetched or read (exit 4). `watch` tells it from a broken
+    local file: it does not poll URLs (spec D-65)."""
+
+
 def fetch(url: str, included_from: str) -> str:
     """The body of `url` as text; `included_from` names the file (or URL) holding the include."""
 
-    def failed(reason: str) -> LoadError:
-        return LoadError(f"{included_from}: cannot fetch {url}: {reason}")
+    def failed(reason: str) -> FetchError:
+        return FetchError(f"{included_from}: cannot fetch {url}: {reason}")
 
     deadline = time.monotonic() + FETCH_TIMEOUT
     try:

@@ -10,7 +10,7 @@ from ruamel.yaml.error import YAMLError
 from ruamel.yaml.events import AliasEvent
 from ruamel.yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
-from troupe.config.fetch import fetch
+from troupe.config.fetch import FetchError, fetch
 from troupe.config.files import SourceFile, find_config, is_yaml_name, is_yaml_url, read_source
 from troupe.config.includes import LITERAL_TAG, REF_KEY, FileRef, UrlRef, include_ref
 from troupe.config.leaves import to_value
@@ -127,7 +127,7 @@ class _Loader:
                 self.composed_root(source)
             except LoadError as error:
                 # Name the include's file too: the user can change only that (spec FR-602).
-                raise LoadError(f"{included_from}: {error.message}") from None
+                raise FetchError(f"{included_from}: {error.message}") from None
         return source
 
     def composed_root(self, source: SourceFile) -> Any:

@@ -10,6 +10,7 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
+from troupe.config.fetch import FetchError
 from troupe.config.files import CONFIG_NAMES, TROUPE_DIR
 from troupe.config.loader import Loaded
 from troupe.config.schema import SCHEMA_NAME
@@ -47,6 +48,11 @@ def changed(snapshot: Snapshot) -> bool:
     return any(_read(path) != data for path, data in snapshot.items())
 
 
+def reread(snapshot: Snapshot) -> Snapshot:
+    """The same files' current bytes: what the next change is compared against."""
+    return {path: _read(path) for path in snapshot}
+
+
 def run_watch(
     theatre: Path,
     sync: Callable[[], Loaded],
@@ -58,7 +64,9 @@ def run_watch(
 
     A failure at start propagates (the command fails like any other). Later, a configuration
     that cannot be loaded is reported once per distinct message and retried on every poll, since
-    which files matter is unknown until it loads again (research S-5).
+    which files matter is unknown until it loads again (research S-5). A remote include that
+    cannot be fetched is reported the same way but retried only after a local file changes
+    (step 7 D-65).
     """
     snapshot = snapshot_of(theatre, sync())
     announce()
@@ -69,6 +77,15 @@ def run_watch(
             continue
         try:
             snapshot = snapshot_of(theatre, sync())
+        except FetchError as error:
+            # A URL that cannot be fetched is not polled (spec D-65): it is fetched again only
+            # when a watched local file changes, so wait for the next change to the files as
+            # they are now. The configuration's files are those of the last successful load.
+            broken = False
+            snapshot = reread(snapshot)
+            if error.message != last_error:
+                report(error.message)
+                last_error = error.message
         except TroupeError as error:
             broken = True
             if error.message != last_error:

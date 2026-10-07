@@ -343,7 +343,7 @@ exits 3 with no change.
   - In `tests/e2e/test_schema_validation.py`, add a `{"$dynamicRef": "https://example.com/s.json"}` case to `test_unusable_schema_cannot_load`.
   - Break each behaviour once to confirm its test fails.
   - Per Constitution II, FR-611, FR-622, FR-630 (partial)
-- [ ] T029 Stop `watch` fetching a failing URL on every poll. In `src/troupe/config/watch.py` `run_watch`, a broken configuration whose last error was a failed fetch must be retried only when a watched local file (or the schema file) changes, not on every `POLL_INTERVAL`.
+- [X] T029 Stop `watch` fetching a failing URL on every poll. In `src/troupe/config/watch.py` `run_watch`, a broken configuration whose last error was a failed fetch must be retried only when a watched local file (or the schema file) changes, not on every `POLL_INTERVAL`.
   - Keep step 2 D-13 behaviour for broken local files.
   - Decide how the failure kind is known in one place: for example a `FetchError(LoadError)` subclass raised by `fetch.py`.
   - Add `tests/e2e/test_remote_watch.py`:
