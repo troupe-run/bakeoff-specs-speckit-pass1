@@ -155,7 +155,7 @@ become local overrides.
 **Independent Test**: each FR-610 case with `assert_refused(…, 3, <url as written>)` plus checks on
 stderr's file and line; the override cases with `assert_set`.
 
-- [ ] T012 [P] [US2] Create `tests/e2e/test_remote_readonly.py` (tests first). The fixture `troupe.yml` is `# team config\nagents:\n  coder: "<url>/coder.yaml"  # team\n` and remote `coder.yaml` is `model: opus\ntools: [git]\nsteps:\n- name: build\n`.
+- [X] T012 [P] [US2] Create `tests/e2e/test_remote_readonly.py` (tests first). The fixture `troupe.yml` is `# team config\nagents:\n  coder: "<url>/coder.yaml"  # team\n` and remote `coder.yaml` is `model: opus\ntools: [git]\nsteps:\n- name: build\n`.
   - **Scenario 1:** `set agents.coder.model sonnet` → `assert_refused(..., 3, "<url>/coder.yaml")`; stderr also contains `.troupe/troupe.yml` and `line 3` (FR-610, FR-611, D-70).
   - **Scenario 2:** `set agents.coder.temperature 0.3` → `assert_set` with `troupe.yml` exactly `# team config\nagents:\n  coder:  # team\n    $ref: "<url>/coder.yaml"\n    temperature: 0.3\n` (FR-612, step 5 FR-422, D-45).
   - **Scenario 3:** with that override present, `set agents.coder.temperature 0.5` changes only the override (FR-613).
@@ -168,11 +168,11 @@ stderr's file and line; the override cases with `assert_set`.
   - `test_alias_in_remote_content_refused` (remote `d: &x {m: 1}\ne: *x`; `set --expand-alias agents.e.m 2` → exit 3 with the URL).
   - `test_same_url_two_sites_names_the_one_on_the_path` (`a: <url>/x.yaml` on line 1 and `b: <url>/x.yaml` on line 2; `set b.k 9` names `line 2`).
   - `test_no_event_recorded_on_refusal` (history is unchanged).
-- [ ] T013 [US2] Create `src/troupe/config/remote.py` (research U-7):
+- [X] T013 [US2] Create `src/troupe/config/remote.py` (research U-7):
   - `remote_site(loaded, path) -> LocatedScalar | None` walks `path.segments` from `loaded.root` through mappings and lists as far as they exist. At each node, `w = written_as(node)`; take its include scalar (`w` if it is a `LocatedScalar`, else the `$ref` scalar of the mapping `w`). If that scalar's `file.path` is a `Path` and the node's content source is a URL (`node.target.path` for a `TextInclude`, else `node.file.path`), remember it. Return the last one remembered.
   - `as_written(scalar)` returns the scalar's source text `file.text[start:end]` with its surrounding quotes removed when `style` is `'"'` or `"'"` (D-70).
   - `refuse_remote(loaded, path, theatre) -> WriteRefused` builds `f"{path}: comes from the remote include {as_written(s)} (line {s.node.start_mark.line + 1} of {source_label(theatre, s.file)}); remote content is read-only — change that include line instead; no file was changed"`.
-- [ ] T014 [US2] Wire the refusal:
+- [X] T014 [US2] Wire the refusal:
   - In `src/troupe/config/edit/apply.py` `apply_set`, compute `target = local_path(plan.file)` before `_reload`, in `try/except RemoteSource: raise refuse_remote(loaded, path, theatre) from None`, and use `target` for `check_writable`/`atomic_write`.
   - In `src/troupe/config/edit/alias.py`, call `local_path(alias.file)` before expanding, mapping `RemoteSource` the same way (thread `theatre` in, or raise `RemoteSource` and catch it in `apply_set`; choose one and keep it in one place).
   - Run T012 to green. Break the guard once (skip `local_path` in `apply_set`) and confirm that mypy fails, then restore it.

@@ -4,10 +4,11 @@ from collections.abc import Callable
 from pathlib import Path
 
 from troupe.config.edit.planner import EditPlan, plan_set
-from troupe.config.files import atomic_write, check_writable, local_path
+from troupe.config.files import RemoteSource, atomic_write, check_writable, local_path
 from troupe.config.leaves import LeafEvent, diff_events, leaves, to_value, written_value
 from troupe.config.loader import Loaded, load
 from troupe.config.paths import ConfigPath, dotted_is_within
+from troupe.config.remote import refuse_remote
 from troupe.config.scalars import NewNode, Scalar, content_start, scalars_equal
 from troupe.config.tree import (
     Located,
@@ -35,10 +36,14 @@ def apply_set(
 
     `before_write` runs just before the file is written; it raises to refuse the write.
     """
-    plan = plan_set(loaded, path, value, in_include=in_include, expand_alias=expand_alias)
-    if plan is None or plan.new_text == plan.file.text:
-        return []
-    target = local_path(plan.file)
+    try:
+        plan = plan_set(loaded, path, value, in_include=in_include, expand_alias=expand_alias)
+        if plan is None or plan.new_text == plan.file.text:
+            return []
+        target = local_path(plan.file)
+    except RemoteSource as error:
+        # Remote content is read-only; say which local include line to change (spec FR-611).
+        raise refuse_remote(loaded, path, theatre) or error from None
     before = leaves(loaded.root)
     after_loaded = _reload(theatre, loaded, target, plan, path)
     after = leaves(after_loaded.root)
