@@ -449,7 +449,10 @@ configuration beyond the platform's defaults; a schema stored anywhere other tha
 - **SC-605**: For `set` of include-like strings, the written bytes equal the expected bytes exactly in
   every combination of schema marking and `--include`.
 - **SC-606**: Every step 1–6 test passes unchanged when no schema exists and no string in its fixtures
-  starts with `https://` or `http://`.
+  starts with `https://` or `http://`, except tests whose `set` VALUE is an include string: FR-640
+  now writes such a VALUE tagged `!literal` unless `--include` is given, so those tests pass
+  `--include` to keep proving what an include written by `set` does (the five in
+  `tests/e2e/test_set_includes.py`; research U-13).
 
 ## Assumptions
 

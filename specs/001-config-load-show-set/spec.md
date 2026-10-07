@@ -206,6 +206,9 @@ then `config history` and `config history <path>`, and compare the JSON Lines ou
   `agents.coder` when it is `file:agents/coder.yaml`) MUST produce exit 3.
 - **FR-025**: After a successful `set`, the only bytes that differ in any file MUST be those the rules
   FR-020 – FR-036 require to change.
+  *(Step 7: a VALUE that is an include string — `file:…`, `https://…`, `http://…` — is written
+  tagged `!literal` unless `set --include` is given; see `specs/007-remote-includes-schema/spec.md`,
+  FR-640 – FR-645.)*
 
 **set — how it is written**
 
