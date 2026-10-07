@@ -176,6 +176,8 @@ then `config history` and `config history <path>`, and compare the JSON Lines ou
 
 - **FR-010**: A string value starting with `file:` MUST be treated as an include of the path after
   `file:`, resolved relative to the directory of the file containing the string.
+  *(Extended by step 7: `https://`/`http://` strings are includes too, and literals never are; see
+  `specs/007-remote-includes-schema/spec.md`, FR-600, FR-620.)*
 - **FR-011**: If the target's name ends in `.yml` or `.yaml`, its parsed content MUST be embedded in
   place of the string; otherwise the value MUST be the target file's exact text (a string).
 - **FR-012**: Includes MUST be followed recursively; a missing target or an include cycle MUST

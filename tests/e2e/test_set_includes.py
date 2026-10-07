@@ -70,9 +70,14 @@ def test_text_file_included_twice(theatre: Theatre) -> None:
     assert_set(theatre, files, "b", "y", {"t.md": "y"})
 
 
+# From step 7 an include string is written as an include only with `set --include` (otherwise it
+# is tagged `!literal`, tests/e2e/test_set_literal.py); these tests keep proving what it creates.
+INCLUDE = ("--include",)
+
+
 def test_value_set_to_a_text_include_string(theatre: Theatre) -> None:
     files = {"troupe.yml": "p: x  # prompt\n", "o.md": "other\n"}
-    assert_set(theatre, files, "p", "file:o.md", {"troupe.yml": "p: file:o.md # prompt\n"})
+    assert_set(theatre, files, "p", "file:o.md", {"troupe.yml": "p: file:o.md # prompt\n"}, INCLUDE)
     assert theatre.config("show", "p").out == "other\n"
     assert theatre.history()[-1] == {
         "seq": 2,
@@ -91,6 +96,7 @@ def test_value_set_to_a_yaml_include_string(theatre: Theatre) -> None:
         "agents.coder",
         "file:c.yaml",
         {"troupe.yml": "agents:\n  coder: file:c.yaml\n"},
+        INCLUDE,
     )
     assert theatre.config("show", "agents.coder.model").out == "m\n"
 
@@ -98,13 +104,20 @@ def test_value_set_to_a_yaml_include_string(theatre: Theatre) -> None:
 def test_include_string_inside_a_new_collection(theatre: Theatre) -> None:
     files = {"troupe.yml": "a: 1\n", "o.md": "hi"}
     assert_set(
-        theatre, files, "b", "{p: 'file:o.md'}", {"troupe.yml": "a: 1\nb:\n  p: file:o.md\n"}
+        theatre,
+        files,
+        "b",
+        "{p: 'file:o.md'}",
+        {"troupe.yml": "a: 1\nb:\n  p: file:o.md\n"},
+        INCLUDE,
     )
 
 
 def test_include_string_with_a_missing_target_is_refused(theatre: Theatre) -> None:
-    assert_refused(theatre, {"troupe.yml": "p: x\n"}, "p", "file:gone.md", 3, "gone.md")
+    assert_refused(theatre, {"troupe.yml": "p: x\n"}, "p", "file:gone.md", 3, "gone.md", INCLUDE)
 
 
 def test_include_string_that_would_form_a_cycle_is_refused(theatre: Theatre) -> None:
-    assert_refused(theatre, {"troupe.yml": "p: x\n"}, "p", "file:troupe.yml", 3, "troupe.yml")
+    assert_refused(
+        theatre, {"troupe.yml": "p: x\n"}, "p", "file:troupe.yml", 3, "troupe.yml", INCLUDE
+    )

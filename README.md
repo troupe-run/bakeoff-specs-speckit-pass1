@@ -2,13 +2,13 @@
 
 troupe is an AI orchestration tool. Each project ("theatre") keeps its configuration in
 `.troupe/troupe.yml` (or `.troupe/troupe.yaml`), which can be split across files with `file:`
-includes. This package provides `troupe config`, which reads and changes that configuration without
+includes and can include shared team configuration from `https://` URLs. This package provides `troupe config`, which reads and changes that configuration without
 disturbing the hand-written files, and records every change as an event.
 
 ```sh
 uv run troupe config get PATH           [--theatre DIR]   # print a scalar setting
 uv run troupe config show [PATH] [--sources] [--theatre DIR]   # print a setting or a section as YAML
-uv run troupe config set PATH VALUE [--reason TEXT] [--in-include] [--expand-alias] [--theatre DIR]   # change it in the file that holds it
+uv run troupe config set PATH VALUE [--reason TEXT] [--in-include] [--expand-alias] [--include] [--theatre DIR]   # change it in the file that holds it
 uv run troupe config history [PATH]     [--theatre DIR]   # list changes as JSON Lines
 uv run troupe config watch              [--theatre DIR]   # record hand edits as they happen
 ```
@@ -58,6 +58,31 @@ uv run troupe config watch              [--theatre DIR]   # record hand edits as
     settings: *d          →                 settings:  # expanded from *d by troupe
                                               model: sonnet
   ```
+- **Remote includes**: a string starting `https://` or `http://` is an include too, fetched each
+  time the configuration loads — YAML if the URL's path ends `.yml`/`.yaml`, otherwise text. A
+  failed fetch (no connection, non-2xx status, more than 10 seconds, not UTF-8, invalid YAML) exits 4.
+  Remote content is read-only: changing a value that comes from it exits 3 and names the include
+  line to change instead; a new key under it still becomes a local override. Remote content may not
+  include local `file:`s. `show --sources` labels remote values with their URL.
+
+  ```yaml
+  agents: https://config.example.com/team/agents.yaml
+  ```
+- **Schema**: `.troupe/troupe.schema.json` (JSON Schema 2020-12), if present, describes the
+  configuration. A configuration that does not validate exits 4 on every command; a `set` that would
+  make it invalid exits 3. `format` is not checked; it marks literals.
+- **Literals**: existing plain `https://`, `http://` and `file:` strings are now includes. A string
+  is taken literally instead when the schema marks its path `"format": "uri"` (found through
+  `properties`, `additionalProperties` and `items`) or when it is tagged `!literal`:
+
+  ```yaml
+  api:
+    endpoint: https://api.example.com/v1        # format: uri in the schema
+  docs: !literal https://example.com/guide.yaml
+  ```
+
+  `set` writes an include-like VALUE tagged `!literal` (`docs: !literal https://…`) unless the
+  schema marks PATH `format: uri`; `set --include PATH VALUE` writes it as an include instead.
 - Hand edits are recorded too: every command except `history` first records, as `set`/`remove`
   events, whatever was edited in the files since the last command. `watch` does the same within
   2 seconds of each edit until you stop it (Ctrl-C or SIGTERM); a formatting- or comment-only edit
@@ -98,4 +123,6 @@ Specification, design decisions and task list: [`specs/001-config-load-show-set/
 files, watch) and [`specs/003-config-get-show/`](specs/003-config-get-show/) (get, show as YAML) and
 [`specs/004-config-lineage/`](specs/004-config-lineage/) (lineage) and
 [`specs/005-include-overrides/`](specs/005-include-overrides/) (overrides) and
-[`specs/006-set-in-include/`](specs/006-set-in-include/) (`set --in-include`).
+[`specs/006-set-in-include/`](specs/006-set-in-include/) (`set --in-include`) and
+[`specs/007-remote-includes-schema/`](specs/007-remote-includes-schema/) (remote includes, schema,
+literals).

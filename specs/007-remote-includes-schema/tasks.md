@@ -297,15 +297,15 @@ exits 3 with no change.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] README (`README.md`): in the usage block, add `[--include]` to the `set` line. Add a "Remote includes and schema" bullet covering:
+- [X] T025 [P] README (`README.md`): in the usage block, add `[--include]` to the `set` line. Add a "Remote includes and schema" bullet covering:
   - URL includes (YAML by URL path, else text; failed fetch → exit 4), shown with a one-line example;
   - read-only remote values (exit 3 names the include line), with new keys becoming local overrides;
   - `.troupe/troupe.schema.json` (2020-12; validation exit 4 / `set` exit 3; `format: uri` literals);
   - `!literal`, and `set` tagging with `--include`;
   - a note: "existing plain `https://` strings are now includes: mark them in the schema or with `!literal`".
   Also add `specs/007-remote-includes-schema/` to the closing links.
-- [ ] T026 [P] In `specs/001-config-load-show-set/spec.md` FR-010, append "*(Extended by step 7: `https://`/`http://` strings are includes too, and literals never are; see `specs/007-remote-includes-schema/spec.md`, FR-600, FR-620.)*" (Principle VI).
-- [ ] T027 Run the gates and show the output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`. Walk through `quickstart.md` and record the results. Commit in small steps with messages that say why.
+- [X] T026 [P] In `specs/001-config-load-show-set/spec.md` FR-010, append "*(Extended by step 7: `https://`/`http://` strings are includes too, and literals never are; see `specs/007-remote-includes-schema/spec.md`, FR-600, FR-620.)*" (Principle VI).
+- [X] T027 Run the gates and show the output: `uv run pytest`, `uv run mypy --strict src tests`, `uv run ruff check .`, `uv run ruff format --check .`. Walk through `quickstart.md` and record the results. Commit in small steps with messages that say why.
 
 ---
 

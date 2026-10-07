@@ -18,12 +18,15 @@ T=$(mktemp -d); W=$(mktemp -d); mkdir -p $T/.troupe
 printf 'coder:\n  model: opus\n  tools: [git]\n' > $W/agents.yaml
 printf 'Be brief.\n' > $W/system.md
 (cd $W && python3 -m http.server 8765 --bind 127.0.0.1 >/dev/null 2>&1 &)
-printf 'agents: http://127.0.0.1:8765/agents.yaml  # team\nprompt: http://127.0.0.1:8765/system.md\napi:\n  endpoint: https://api.example.com/v1\n' > $T/.troupe/troupe.yml
+printf 'agents: http://127.0.0.1:8765/agents.yaml  # team\nprompt: http://127.0.0.1:8765/system.md\n' > $T/.troupe/troupe.yml
 
 uv run troupe config get agents.coder.model --theatre $T          # opus
 uv run troupe config get prompt --theatre $T                      # Be brief.
 uv run troupe config show agents --sources --theatre $T           # # from http://127.0.0.1:8765/agents.yaml
-uv run troupe config get api.endpoint --theatre $T; echo "exit $?" # no schema yet: fetched as an include (exit 4 offline)
+
+# A URL setting with no schema is an include: every command now fetches it.
+printf 'api:\n  endpoint: https://api.example.com/v1\n' >> $T/.troupe/troupe.yml
+uv run troupe config get prompt --theatre $T; echo "exit $?"      # exit 4 unless api.example.com/v1 can be fetched
 
 cat > $T/.troupe/troupe.schema.json <<'JSON'
 {"properties": {"api": {"properties": {"endpoint": {"type": "string", "format": "uri"}}},
