@@ -14,7 +14,7 @@ from troupe.config.fetch import fetch
 from troupe.config.files import SourceFile, find_config, is_yaml_name, is_yaml_url, read_source
 from troupe.config.includes import LITERAL_TAG, REF_KEY, FileRef, UrlRef, include_ref
 from troupe.config.scalars import ALIAS_NAME, ALIAS_TARGET, resolve_node
-from troupe.config.schema import SubSchema, is_uri, schema_child
+from troupe.config.schema import Schema, SubSchema, is_uri, load_schema, schema_child
 from troupe.config.tree import (
     Located,
     LocatedMapping,
@@ -36,6 +36,7 @@ class Loaded:
     composed: dict[Path | str, Any] = field(default_factory=dict)
     # Fetched documents by URL, reused by a command's re-checks (spec D-62, research U-3).
     remote: dict[str, SourceFile] = field(default_factory=dict)
+    schema: Schema | None = None
 
 
 class _AliasComposer(Composer):
@@ -96,7 +97,7 @@ def compose(source: SourceFile) -> Any:
 
 class _Loader:
     def __init__(
-        self, overrides: dict[Path, str], fetched: dict[str, SourceFile], schema: SubSchema
+        self, overrides: dict[Path, str], fetched: dict[str, SourceFile], schema: Schema | None
     ) -> None:
         self.overrides = overrides
         self.files: dict[Path, SourceFile] = {}
@@ -140,12 +141,13 @@ class _Loader:
         if node is None:
             root = LocatedMapping(source, None, in_flow=False)
         elif isinstance(node, MappingNode):
-            located = self.build(node, source, False, (main,), self.schema)
+            root_schema = None if self.schema is None else self.schema.document
+            located = self.build(node, source, False, (main,), root_schema)
             assert isinstance(located, LocatedMapping)
             root = located
         else:
             raise LoadError(f"{source.path}: the top level must be a mapping")
-        return Loaded(root, self.files, self.composed, self.fetched)
+        return Loaded(root, self.files, self.composed, self.fetched, self.schema)
 
     def is_include(self, scalar: LocatedScalar, sub: SubSchema) -> FileRef | UrlRef | None:
         """What `scalar` includes, or None when it is not an include: not an include string, or
@@ -317,7 +319,7 @@ def reload(loaded: Loaded, overrides: dict[Path, str]) -> Loaded:
     documents `loaded` fetched reused (spec D-62)."""
     main = loaded.root.file.path
     assert isinstance(main, Path)
-    return _Loader(overrides, loaded.remote, None).load(main)
+    return _Loader(overrides, loaded.remote, loaded.schema).load(main)
 
 
 def load(
@@ -327,4 +329,5 @@ def load(
 ) -> Loaded:
     """Load the theatre's configuration. `overrides` substitutes file texts (by resolved path);
     `fetched` supplies documents already fetched by this command (by URL, spec D-62)."""
-    return _Loader(overrides or {}, fetched or {}, None).load(find_config(theatre))
+    main = find_config(theatre)
+    return _Loader(overrides or {}, fetched or {}, load_schema(theatre)).load(main)

@@ -189,7 +189,7 @@ a literal; nothing is fetched or read for it.
 **Independent Test**: fixtures with literals; `get` prints the string; `web.requests == []`; a
 `file:` literal's file is never needed.
 
-- [ ] T015 [P] [US3] Create `tests/e2e/test_literals.py` (tests first). Each fixture uses `web.url(...)` strings so any fetch would be visible:
+- [X] T015 [P] [US3] Create `tests/e2e/test_literals.py` (tests first). Each fixture uses `web.url(...)` strings so any fetch would be visible:
   - **Scenario 1:** schema `{"properties": {"api": {"properties": {"endpoint": {"type": "string", "format": "uri"}}}}}` written to `.troupe/troupe.schema.json` → `get api.endpoint` prints the URL and `web.requests == []`.
   - **Scenario 2:** `items`.
   - **Scenario 3:** `additionalProperties`.
@@ -205,12 +205,12 @@ a literal; nothing is fetched or read for it.
   - `test_show_prints_literal_untagged` (`show` output has no `!literal`; D-67).
   - `test_schema_change_is_reconciled` (add the schema after the first `get`; the next `get` records the include's leaves removed and the string set).
   - `test_watch_sees_schema_file` (with `start_watch`: writing the schema file is recorded within 2 s).
-- [ ] T016 [US3] Implement literals while loading (research U-5, U-8):
+- [X] T016 [US3] Implement literals while loading (research U-5, U-8):
   - In `src/troupe/config/scalars.py`, `resolve_node` returns `text` first when `node.tag == LITERAL_TAG` (before alias and core-schema typing). `content_start` also skips a leading `!literal` tag token and the spaces after it (only that tag; other explicit tags unchanged). Docstring note "step 7, FR-644".
   - In `loader._Loader.is_include`, return `None` when `scalar.node.tag == LITERAL_TAG` or `is_uri(sub)`.
   - In `build`, a `SequenceNode`/`MappingNode` with `tag == LITERAL_TAG` raises `LoadError(f"{source.path}: line {n}: !literal applies to a single value, not a mapping or list")`.
   - Run the existing test suite to confirm that anchors and `!!str` behave as before.
-- [ ] T017 [US3] In `src/troupe/config/schema.py` add `SCHEMA_NAME = "troupe.schema.json"`, `@dataclass Schema(path: Path, document: dict[str, Any])` and `load_schema(theatre) -> Schema | None` (research U-5):
+- [X] T017 [US3] In `src/troupe/config/schema.py` add `SCHEMA_NAME = "troupe.schema.json"`, `@dataclass Schema(path: Path, document: dict[str, Any])` and `load_schema(theatre) -> Schema | None` (research U-5):
   - A missing file gives `None`.
   - The file is read with `read_source`; invalid JSON → `LoadError(f"{path}: invalid JSON: …")`; a top level that is not an object → `LoadError`.
   - `$schema` must be absent or equal to `https://json-schema.org/draft/2020-12/schema`, else `LoadError(f"{path}: $schema must be JSON Schema 2020-12")`.

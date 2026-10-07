@@ -13,6 +13,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
+from troupe.config.includes import LITERAL_TAG
 from troupe.errors import UsageError
 
 type Scalar = str | int | float | bool | None
@@ -63,6 +64,10 @@ def resolve_node(node: ScalarNode, source: str) -> Scalar:
     # An alias is typed as the node it refers to (step 6).
     node = getattr(node, ALIAS_TARGET, node)
     text: str = node.value
+    if node.tag == LITERAL_TAG:
+        # `!literal` takes the text literally, as a string, whatever it looks like (step 7
+        # FR-622, D-66).
+        return text.replace("\a", "") if node.style == ">" else text
     if node.style == ">":
         # ruamel's round-trip composer marks fold points with BEL; a folded scalar cannot hold
         # a real BEL (it is not printable), so the markers are removed.
@@ -89,14 +94,17 @@ def resolve_node(node: ScalarNode, source: str) -> Scalar:
 
 def content_start(text: str, node: Node) -> int:
     """Where a node's own bytes start: after its `&anchor`, so a change to the value keeps the
-    anchor. An anchored collection starts at its first entry; an empty anchored scalar just after
-    the anchor."""
-    offset = int(node.start_mark.index)
+    anchor, and after a `!literal` tag, so a change keeps the tag (step 7 FR-644). An anchored
+    collection starts at its first entry; an empty anchored scalar just after the anchor."""
+    offset = _after_literal_tag(text, int(node.start_mark.index))
     if not text.startswith("&", offset):
         return offset
     while offset < len(text) and text[offset] not in " \t\r\n,[]{}":
         offset += 1
     anchor_end = offset
+    tag_end = literal_tag_end(text, _skip_blanks(text, offset))
+    if tag_end is not None:
+        anchor_end = offset = tag_end  # `&a !literal x`: the tag stays with the anchor
     while offset < len(text):
         if text[offset] in " \t":
             offset += 1
@@ -110,6 +118,28 @@ def content_start(text: str, node: Node) -> int:
         else:
             break
     return offset
+
+
+def _skip_blanks(text: str, offset: int) -> int:
+    while offset < len(text) and text[offset] in " \t":
+        offset += 1
+    return offset
+
+
+def literal_tag_end(text: str, offset: int) -> int | None:
+    """The end of a `!literal` tag and the blanks after it at `offset`, or None if there is
+    none there."""
+    end = offset + len(LITERAL_TAG)
+    if not text.startswith(LITERAL_TAG, offset):
+        return None
+    if end < len(text) and text[end] not in " \t\r\n":
+        return None  # a longer tag, e.g. `!literally`
+    return _skip_blanks(text, end)
+
+
+def _after_literal_tag(text: str, offset: int) -> int:
+    end = literal_tag_end(text, offset)
+    return offset if end is None else end
 
 
 def scalars_equal(a: Value, b: Value) -> bool:

@@ -12,6 +12,7 @@ from pathlib import Path
 
 from troupe.config.files import CONFIG_NAMES, TROUPE_DIR
 from troupe.config.loader import Loaded
+from troupe.config.schema import SCHEMA_NAME
 from troupe.errors import TroupeError
 
 # Well inside the contract's 2 seconds, and cheap: configurations are small.
@@ -29,11 +30,13 @@ def _read(path: Path) -> bytes | None:
 
 def snapshot_of(theatre: Path, loaded: Loaded) -> Snapshot:
     """The bytes of every file the configuration was loaded from (the main file and every file
-    reached by includes), plus both config-file names, so creating or deleting either is seen."""
+    reached by includes), plus both config-file names and the schema file, so creating or
+    deleting any of them is seen."""
     snapshot: Snapshot = {
         path: source.text.encode("utf-8") for path, source in loaded.files.items()
     }
-    for name in CONFIG_NAMES:
+    # The schema decides which strings are literals, so it is watched too (step 7, research U-6).
+    for name in (*CONFIG_NAMES, SCHEMA_NAME):
         path = (theatre / TROUPE_DIR / name).resolve()
         if path not in snapshot:
             snapshot[path] = _read(path)

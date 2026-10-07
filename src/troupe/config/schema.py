@@ -6,9 +6,73 @@ A value's subschema is found from the root one segment at a time through `proper
 `"format": "uri"` is a literal, never an include.
 """
 
+import json
+from collections.abc import Iterator
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import SchemaError
+
+from troupe.config.files import TROUPE_DIR, read_source
+from troupe.errors import LoadError
+
+SCHEMA_NAME = "troupe.schema.json"  # under TROUPE_DIR (spec FR-630)
+DIALECT = "https://json-schema.org/draft/2020-12/schema"
+_REF_KEYWORDS = ("$ref", "$dynamicRef")
+
 type SubSchema = dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class Schema:
+    path: Path
+    document: dict[str, Any]
+
+
+def schema_path(theatre: Path) -> Path:
+    return theatre / TROUPE_DIR / SCHEMA_NAME
+
+
+def load_schema(theatre: Path) -> Schema | None:
+    """The theatre's schema, or None when it has none. A schema that cannot be used makes the
+    configuration unloadable: exit 4 naming the schema file (FR-630)."""
+    path = schema_path(theatre)
+    if not path.exists():
+        return None
+    path = path.resolve()
+    source = read_source(path)
+    try:
+        document = json.loads(source.text)
+    except json.JSONDecodeError as error:
+        raise LoadError(f"{path}: invalid JSON: {error}") from None
+    if not isinstance(document, dict):
+        raise LoadError(f"{path}: a schema must be a JSON object")
+    dialect = document.get("$schema", DIALECT)
+    if dialect != DIALECT:
+        raise LoadError(f"{path}: $schema must be JSON Schema 2020-12 ({DIALECT}), not {dialect!r}")
+    try:
+        Draft202012Validator.check_schema(document)
+    except SchemaError as error:
+        raise LoadError(f"{path}: not a valid JSON Schema: {error.message}") from None
+    for reference in _references(document):
+        if not reference.startswith("#"):
+            # The schema never causes a fetch or a read elsewhere (spec D-64).
+            raise LoadError(f"{path}: $ref {reference!r} points outside the schema")
+    return Schema(path, document)
+
+
+def _references(value: object) -> Iterator[str]:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in _REF_KEYWORDS and isinstance(item, str):
+                yield item
+            else:
+                yield from _references(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _references(item)
 
 
 def schema_child(sub: SubSchema, segment: str | int) -> SubSchema:
