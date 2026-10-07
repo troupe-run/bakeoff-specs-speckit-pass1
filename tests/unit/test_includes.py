@@ -5,8 +5,13 @@ from pathlib import Path
 
 import pytest
 
+from troupe.config.edit.literals import mark
 from troupe.config.files import RemoteSource, SourceFile, is_yaml_url, local_path
-from troupe.config.includes import FileRef, UrlRef, include_ref
+from troupe.config.includes import LITERAL_TAG, FileRef, UrlRef, include_ref
+from troupe.config.paths import ConfigPath
+from troupe.config.scalars import NewNode, NewScalar
+from troupe.config.schema import Schema
+from troupe.errors import WriteRefused
 
 
 def test_file_prefix() -> None:
@@ -51,3 +56,42 @@ def test_local_path_refuses_a_url() -> None:
 
 def test_local_path_gives_a_local_path() -> None:
     assert local_path(SourceFile(Path("/x/a.yaml"), "", "yaml")) == Path("/x/a.yaml")
+
+
+# --- literals.mark (spec FR-640 to FR-643, D-68, D-69) ---
+
+
+def _schema(document: dict[str, object]) -> Schema:
+    return Schema(Path("/t/.troupe/troupe.schema.json"), document)
+
+
+URI = {"format": "uri"}
+
+
+def test_mark_tags_include_like_strings() -> None:
+    marked = mark(NewScalar("https://x"), ConfigPath.parse("a"), None, include=False)
+    assert marked == NewScalar("https://x", tag=LITERAL_TAG)
+    plain = NewScalar("plain")
+    assert mark(plain, ConfigPath.parse("a"), None, include=False) == plain
+    assert mark(NewScalar(5), ConfigPath.parse("a"), None, include=False) == NewScalar(5)
+
+
+def test_mark_respects_format_uri() -> None:
+    schema = _schema({"properties": {"a": {"properties": {"u": URI}}}})
+    marked = mark(NewScalar("https://x"), ConfigPath.parse("a.u"), schema, include=False)
+    assert marked == NewScalar("https://x")
+
+
+def test_mark_nested_paths() -> None:
+    schema = _schema({"properties": {"b": {"properties": {"l": {"items": URI}}}}})
+    value: NewNode = {"l": [NewScalar("https://x")], "v": NewScalar("file:y")}
+    marked = mark(value, ConfigPath.parse("b"), schema, include=False)
+    assert marked == {"l": [NewScalar("https://x")], "v": NewScalar("file:y", tag=LITERAL_TAG)}
+
+
+def test_mark_include_flag() -> None:
+    value = NewScalar("https://x")
+    assert mark(value, ConfigPath.parse("a"), None, include=True) == value
+    schema = _schema({"properties": {"a": URI}})
+    with pytest.raises(WriteRefused):
+        mark(value, ConfigPath.parse("a"), schema, include=True)

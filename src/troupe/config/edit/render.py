@@ -114,9 +114,19 @@ def can_style(value: Scalar, style: str | None, in_flow: bool) -> bool:
     return style == DOUBLE
 
 
+def tagged(scalar: NewScalar, text: str) -> str:
+    """`text` — a scalar's spelling or a literal block's header — after the scalar's tag, if it
+    has one. A tag is spelled here and only here (step 7 FR-640, research U-8)."""
+    return f"{scalar.tag} {text}" if scalar.tag else text
+
+
 def render_inline(scalar: NewScalar, preferred: str | None, in_flow: bool) -> str:
-    """One-line spelling: keep `preferred` if it can represent the value, else plain, single,
-    double (FR-026/FR-027)."""
+    """One-line spelling, after any tag: keep `preferred` if it can represent the value, else
+    plain, single, double (FR-026/FR-027)."""
+    return tagged(scalar, _spell_inline(scalar, preferred, in_flow))
+
+
+def _spell_inline(scalar: NewScalar, preferred: str | None, in_flow: bool) -> str:
     value = scalar.value
     if not isinstance(value, str):
         return scalar.spelling if scalar.spelling is not None else canonical_plain(value)
@@ -221,7 +231,7 @@ def render_value_lines(
         value = node.value
         if is_multiline(value) and isinstance(value, str) and literal_representable(value):
             header, lines = render_literal(value, column, step)
-            return header, lines
+            return tagged(node, header), lines
         return render_inline(node, preferred, in_flow=False), []
     if is_empty_collection(node):
         return render_flow(node), []

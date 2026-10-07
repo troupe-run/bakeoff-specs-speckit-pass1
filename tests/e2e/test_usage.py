@@ -120,3 +120,22 @@ def test_in_include_with_reason(ready: Theatre) -> None:
     result = ready.config("set", "a", "3", "--in-include", "--reason", "why")
     assert result.code == 0, result
     assert ready.events()[-1]["reason"] == "why"
+
+
+@pytest.mark.parametrize(
+    "args",
+    [("get", "a", "--include"), ("show", "--include"), ("history", "--include"),
+     ("watch", "--include"), ("set", "a", "1", "--include=yes")],
+)  # fmt: skip
+def test_include_flag_only_on_set_and_without_a_value(
+    ready: Theatre, args: tuple[str, ...]
+) -> None:
+    before = ready.snapshot()
+    assert_failed(ready.config(*args), 2, "--include")
+    assert ready.snapshot() == before
+
+
+def test_include_flag_in_any_position_with_other_flags(ready: Theatre) -> None:
+    result = ready.config("set", "--include", "a", "2", "--reason", "r", "--in-include")
+    assert result.code == 0, result
+    assert ready.events()[-1]["reason"] == "r"

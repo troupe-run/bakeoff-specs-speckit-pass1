@@ -49,6 +49,12 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="replace a YAML alias on PATH with its own copy of the anchored value first",
     )
+    set_parser.add_argument(
+        "--include",
+        action="store_true",
+        help="write an include-like VALUE (https://…, http://…, file:…) as an include, "
+        "not as a !literal string",
+    )
     add("history", "list configuration changes as JSON Lines").add_argument(
         "path", metavar="PATH", nargs="?"
     )
@@ -97,6 +103,7 @@ def run(argv: Sequence[str]) -> str:
             reason=args.reason,
             in_include=args.in_include,
             expand_alias=args.expand_alias,
+            include=args.include,
         )
     return commands.history(theatre, args.path)
 

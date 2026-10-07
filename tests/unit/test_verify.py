@@ -19,7 +19,7 @@ def _theatre(tmp_path: Path, text: str) -> Path:
 
 
 def _plan_returning(monkeypatch: pytest.MonkeyPatch, new_text: str, expected: Value) -> None:
-    def fake_plan(loaded, path, value, *, in_include=False, expand_alias=False):  # type: ignore[no-untyped-def]
+    def fake_plan(loaded, path, value, *, in_include=False, expand_alias=False, include=False):  # type: ignore[no-untyped-def]
         node = loaded.root.get("a")
         return EditPlan(loaded.root.file, new_text, node, path, (), expected)
 

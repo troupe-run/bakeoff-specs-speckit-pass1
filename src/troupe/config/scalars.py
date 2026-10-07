@@ -173,10 +173,12 @@ def format_scalar(value: Scalar) -> str:
 
 @dataclass(frozen=True)
 class NewScalar:
-    """A scalar from the command line. `spelling` is its text when it was written plain."""
+    """A scalar from the command line. `spelling` is its text when it was written plain; `tag`
+    is written before it (`!literal`, step 7 FR-640) and is not part of the value."""
 
     value: Scalar
     spelling: str | None = None
+    tag: str | None = None
 
 
 type NewNode = NewScalar | list[NewNode] | dict[str, NewNode]

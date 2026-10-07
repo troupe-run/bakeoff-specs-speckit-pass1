@@ -18,11 +18,20 @@ from troupe.config.edit.planner import (
     plan_set,
 )
 from troupe.config.files import local_path
+from troupe.config.includes import LITERAL_TAG
 from troupe.config.leaves import written_value
 from troupe.config.loader import Loaded, reload
 from troupe.config.paths import ConfigPath
 from troupe.config.scalars import NewNode, NewScalar, Value
-from troupe.config.tree import LocatedMapping, LocatedScalar, LocatedSequence, alias_name
+from troupe.config.tree import (
+    Located,
+    LocatedMapping,
+    LocatedScalar,
+    LocatedSequence,
+    TextInclude,
+    alias_name,
+    written_as,
+)
 from troupe.errors import LoadError, WriteRefused
 
 type Alias = LocatedScalar | LocatedMapping | LocatedSequence
@@ -39,6 +48,7 @@ def through_alias(
     *,
     in_include: bool,
     expand: bool,
+    include: bool = False,
 ) -> EditPlan | None:
     """Refuse a change below `alias`, or with `expand` plan it on a copy of the anchored node."""
     name = alias_name(alias)
@@ -54,7 +64,7 @@ def through_alias(
             f"{path}: the alias *{name} in {alias.file.path} is inside a flow collection, "
             "where a block-style copy cannot go; expand it by hand"
         )
-    copy = _as_new(written_value(alias))
+    copy = _copy(alias)
     if _has_merge_key(copy):
         raise WriteRefused(
             f"{path}: &{name} holds a merge key ({MERGE_KEY}); troupe never writes one"
@@ -68,7 +78,7 @@ def through_alias(
             f"{path}: expanding *{name} in {alias.file.path} would not load back "
             f"({error.message}); no file was changed"
         ) from None
-    plan = plan_set(basis, path, value, in_include=in_include, expand_alias=True)
+    plan = plan_set(basis, path, value, in_include=in_include, expand_alias=True, include=include)
     if plan is None:
         return None
     if plan.file.path != alias.file.path:
@@ -93,6 +103,18 @@ def _expand(
     ctx.splices.append((after, alias.end, f"{head}  {COMMENT.format(name=name)}"))
     ctx.insert_after_line(ctx.lines.index_of(alias.end), following)
     return ctx.result()
+
+
+def _copy(node: Located) -> NewNode:
+    """The anchored value as written, to be written again: includes as their include strings,
+    and a `!literal` tag kept, so the copy reads back as the same value (step 7 FR-620)."""
+    if written_as(node) is not None or isinstance(node, TextInclude):
+        return _as_new(written_value(node))
+    if isinstance(node, LocatedMapping):
+        return {str(key.node.value): _copy(value) for key, value in node.entries}
+    if isinstance(node, LocatedSequence):
+        return [_copy(item) for item in node.items]
+    return NewScalar(node.value, tag=LITERAL_TAG if node.node.tag == LITERAL_TAG else None)
 
 
 def _as_new(value: Value) -> NewNode:

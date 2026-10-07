@@ -76,7 +76,8 @@ def test_ref_value_is_still_an_include_under_a_format_uri_position(
     theatre: Theatre, web: Web
 ) -> None:
     web.write("c.yaml", "model: opus\n")
-    write_schema(theatre, {"properties": {"coder": URI}})
+    # No `type`: the include makes `coder` a mapping, which `format` alone does not forbid.
+    write_schema(theatre, {"properties": {"coder": {"format": "uri"}}})
     theatre.write("troupe.yml", f"coder: {{$ref: {web.url('c.yaml')}}}\n")
     assert theatre.config("get", "coder.model").out == "opus\n"
 
@@ -100,7 +101,8 @@ def test_literal_tag_on_a_mapping_cannot_load(theatre: Theatre) -> None:
 
 def test_pattern_properties_are_not_followed(theatre: Theatre, web: Web) -> None:
     web.write("p.yaml", "k: 1\n")
-    write_schema(theatre, {"patternProperties": {"^p": URI}})
+    # No `type`: the value is fetched as a mapping, which `format` alone does not forbid.
+    write_schema(theatre, {"patternProperties": {"^p": {"format": "uri"}}})
     theatre.write("troupe.yml", f"p: {web.url('p.yaml')}\n")
     assert theatre.config("get", "p.k").out == "1\n"
 

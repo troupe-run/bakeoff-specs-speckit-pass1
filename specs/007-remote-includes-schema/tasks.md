@@ -258,7 +258,7 @@ exits 3 with no change.
 
 **Independent Test**: `assert_set` byte comparisons over the tagging matrix (contracts/cli.md).
 
-- [ ] T020 [P] [US5] Create `tests/e2e/test_set_literal.py` (tests first, using `assert_set` with exact bytes):
+- [X] T020 [P] [US5] Create `tests/e2e/test_set_literal.py` (tests first, using `assert_set` with exact bytes):
   - **Scenario 1:** `docs: old\n` + `set docs https://example.com/guide` → `docs: !literal https://example.com/guide\n`; `get docs` prints the URL (FR-640).
   - **Scenario 2:** schema marks `api.endpoint` → `  endpoint: https://api.example.com/v2\n`, untagged (FR-641).
   - **Scenario 3:** `set --include agents <web url>/agents.yaml` (new key) → `agents: <url>\n`, and `get agents.coder.model` works (FR-642).
@@ -278,14 +278,14 @@ exits 3 with no change.
   - `test_multiline_include_like_string_uses_literal_block` (`"https://x\ny"` → `a: !literal |-` + content; U-8).
   - `test_events_have_no_tag` (the history `new` is the plain URL; FR-646).
   - `test_text_include_target_written_untagged` (`set prompt https://x` where `prompt: file:p.md` → `p.md` contains `https://x`, no tag).
-- [ ] T021 [P] [US5] Extend `tests/e2e/test_usage.py`: `test_include_on_other_subcommands_exits_2`, parametrised over `get a --include`, `show --include`, `history --include`, `watch --include` → exit 2 naming `--include`, no file changed. Also `test_include_with_a_value_exits_2` and `test_include_any_position_with_other_flags` (`set --include a 1 --reason r --in-include` → exit 0) (FR-645).
-- [ ] T022 [US5] In `src/troupe/config/scalars.py`, add `tag: str | None = None` to `NewScalar`; `plain_value` ignores it.
+- [X] T021 [P] [US5] Extend `tests/e2e/test_usage.py`: `test_include_on_other_subcommands_exits_2`, parametrised over `get a --include`, `show --include`, `history --include`, `watch --include` → exit 2 naming `--include`, no file changed. Also `test_include_with_a_value_exits_2` and `test_include_any_position_with_other_flags` (`set --include a 1 --reason r --in-include` → exit 0) (FR-645).
+- [X] T022 [US5] In `src/troupe/config/scalars.py`, add `tag: str | None = None` to `NewScalar`; `plain_value` ignores it.
   - In `src/troupe/config/edit/render.py`, `render_inline` returns `f"{scalar.tag} {text}"` when `scalar.tag` is set, and the literal-block header path (`render_literal` callers in `render_value_lines`/`render_block`) prefixes `tag + " "` before `|`. These are the only places; check with `grep -n "NewScalar(" src/troupe/config/edit` that every rendering route goes through them.
   - Comment: "the tag is spelled here and only here (research U-8)".
-- [ ] T023 [US5] Create `src/troupe/config/edit/literals.py` (research U-8):
+- [X] T023 [US5] Create `src/troupe/config/edit/literals.py` (research U-8):
   - `mark(value: NewNode, path: ConfigPath, schema: Schema | None, include: bool) -> NewNode`. It walks `value` with `schema_child` from the subschema at `path` (computed from the root through `path.segments`) and returns a copy where each `NewScalar` whose value is a `str` with `include_ref(...)` set and not `is_uri(sub)` gets `tag=LITERAL_TAG` unless `include`. With `include`, a string under `is_uri(sub)` raises `WriteRefused(f"{path}: the schema marks it format: uri, so it cannot be an include; no file was changed")` (D-68).
   - Unit tests in `tests/unit/test_includes.py`: `test_mark_tags_include_like_strings`, `test_mark_respects_format_uri`, `test_mark_nested_paths`, `test_mark_include_flag`.
-- [ ] T024 [US5] Wire `--include`:
+- [X] T024 [US5] Wire `--include`:
   - In `src/troupe/cli.py`, add `set_parser.add_argument("--include", action="store_true", help="write an include-like VALUE as an include, not a !literal string")` and pass `include=args.include`.
   - In `src/troupe/config/commands.py` `set_value(..., include: bool = False)`: after `open_theatre`, `value = mark(value, path, loaded.schema, include)`, then pass `include=include` to `apply_set` → `plan_set` → `planner._replace_scalar`.
   - In `src/troupe/config/edit/planner.py` `_replace_scalar`, when the target node's tag is `LITERAL_TAG`: without `include`, drop the new scalar's tag (keep the existing one, FR-644); with `include`, start the replaced span at `target.node.start_mark` past any anchor (i.e. at the tag), so the tag and its space are removed. Comment: "spec FR-644, D-67".

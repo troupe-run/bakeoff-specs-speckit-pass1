@@ -8,6 +8,7 @@ from pathlib import Path
 
 from troupe.config import view
 from troupe.config.edit.apply import apply_set
+from troupe.config.edit.literals import mark
 from troupe.config.leaves import leaves
 from troupe.config.lineage import UNKNOWN_ACTOR, Actor, Lineage
 from troupe.config.loader import Loaded, load
@@ -126,6 +127,7 @@ def set_value(
     *,
     in_include: bool = False,
     expand_alias: bool = False,
+    include: bool = False,
 ) -> str:
     path = ConfigPath.parse(path_text)
     value = parse_value(value_text)
@@ -133,6 +135,8 @@ def set_value(
     # load it, and `watch` then finds nothing to record (spec FR-130).
     with theatre_lock(theatre):
         loaded, store = open_theatre(theatre, reconcile=True)
+        # Include-like strings are written `!literal` unless asked otherwise (spec FR-640).
+        value = mark(value, path, loaded.schema, include=include)
         events = apply_set(
             theatre,
             loaded,
@@ -141,6 +145,7 @@ def set_value(
             before_write=store.check_writable,
             in_include=in_include,
             expand_alias=expand_alias,
+            include=include,
         )
         # Begun after open_theatre, so any import or reconcile above is a unit of its own with
         # its own change and at, and is never credited to this command's actor (spec D-30).

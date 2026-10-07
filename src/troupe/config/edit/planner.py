@@ -5,6 +5,7 @@ never writes; `apply.py` verifies the result and writes it.
 """
 
 from dataclasses import dataclass, field
+from dataclasses import replace as dc_replace
 
 from troupe.config.edit import folded, render
 from troupe.config.edit.layout import (
@@ -18,6 +19,7 @@ from troupe.config.edit.layout import (
     scalar_spans,
 )
 from troupe.config.files import CRLF, LF, SourceFile
+from troupe.config.includes import LITERAL_TAG, include_ref
 from troupe.config.loader import Loaded
 from troupe.config.paths import ConfigPath, is_index
 from troupe.config.scalars import NewNode, NewScalar, Value, plain_value, scalars_equal
@@ -72,8 +74,10 @@ def plan_set(
     *,
     in_include: bool = False,
     expand_alias: bool = False,
+    include: bool = False,
 ) -> EditPlan | None:
-    """Plan `set PATH VALUE`; None when the value is already what was asked (nothing to do)."""
+    """Plan `set PATH VALUE`; None when the value is already what was asked (nothing to do).
+    `include` is `set --include`: an existing `!literal` tag goes when an include is written."""
     from troupe.config.edit.alias import through_alias
     from troupe.config.edit.override import Walk, place_new_key
 
@@ -115,10 +119,17 @@ def plan_set(
         if is_alias(node) and depth < len(path.segments) - 1:
             # Below an alias is the anchored node, shared by every alias (step 6).
             return through_alias(
-                loaded, node, owner, path, value, in_include=in_include, expand=expand_alias
+                loaded,
+                node,
+                owner,
+                path,
+                value,
+                in_include=in_include,
+                expand=expand_alias,
+                include=include,
             )
     assert owner is not None
-    return _replace(loaded, node, owner, value, path)
+    return _replace(loaded, node, owner, value, path, include=include)
 
 
 # --- Shared context ------------------------------------------------------------------------
@@ -344,7 +355,13 @@ def _style_of(node: Located | None) -> str | None:
 
 
 def _replace(
-    loaded: Loaded, target: Located, owner: _Owner, value: NewNode, path: ConfigPath
+    loaded: Loaded,
+    target: Located,
+    owner: _Owner,
+    value: NewNode,
+    path: ConfigPath,
+    *,
+    include: bool = False,
 ) -> EditPlan | None:
     if (
         isinstance(target, LocatedMapping)
@@ -368,7 +385,8 @@ def _replace(
         # The alias itself is replaced: only its `*name` changes, the anchor stays (step 6).
         _replace_alias(ctx, target, owner, value)
     elif isinstance(target, LocatedScalar):
-        _replace_scalar(ctx, target, owner, value)
+        value, untag_from = _literal_tag(ctx, target, value, path, include=include)
+        _replace_scalar(ctx, target, owner, value, untag_from)
     else:
         _replace_collection(ctx, target, owner, value)
     return EditPlan(ctx.file, ctx.result(), target, anchor_path, (), expected)
@@ -437,10 +455,34 @@ def _after_properties(ctx: _Context, offset: int) -> int:
     return probe
 
 
-def _replace_scalar(ctx: _Context, target: LocatedScalar, owner: _Owner, value: NewNode) -> None:
+def _literal_tag(
+    ctx: _Context, target: LocatedScalar, value: NewNode, path: ConfigPath, *, include: bool
+) -> tuple[NewNode, int | None]:
+    """An existing `!literal` tag stays, so the new value needs none of its own; with `--include`
+    and an include string, the tag goes: returns where the replaced span then starts (step 7
+    FR-644, D-67)."""
+    if target.node.tag != LITERAL_TAG or not isinstance(value, NewScalar):
+        return value, None
+    if not (include and include_ref(value.value) is not None):
+        return dc_replace(value, tag=None), None
+    if target.style in (render.LITERAL, render.FOLDED) or target.node.value == "":
+        raise WriteRefused(
+            f"{path}: remove the {LITERAL_TAG} tag in {ctx.file.path} by hand to make it an include"
+        )
+    return value, ctx.text.rfind(LITERAL_TAG, 0, target.start)
+
+
+def _replace_scalar(
+    ctx: _Context,
+    target: LocatedScalar,
+    owner: _Owner,
+    value: NewNode,
+    untag_from: int | None = None,
+) -> None:
     owner_column = _owner_column(ctx, owner)
     if target.in_flow:
-        ctx.inline(target.start, target.end, _flow_text(value, target.style))
+        start = target.start if untag_from is None else untag_from
+        ctx.inline(start, target.end, _flow_text(value, target.style))
         return
     if target.style in (render.LITERAL, render.FOLDED):
         _replace_block_scalar(ctx, target, owner, owner_column, value)
@@ -452,6 +494,8 @@ def _replace_scalar(ctx: _Context, target: LocatedScalar, owner: _Owner, value: 
         _after_properties(ctx, _after_indicator(ctx, owner, target.start))
         if empty
         else target.start
+        if untag_from is None
+        else untag_from
     )
     end = start if empty else target.end
     lead = " " if empty else ""
@@ -479,7 +523,7 @@ def _write_value(
             and render.literal_representable(text_value)
         ):
             header, lines = render.render_literal(text_value, owner_column + ctx.step, ctx.step)
-            ctx.inline(start, end, lead + header)
+            ctx.inline(start, end, lead + render.tagged(value, header))
             ctx.insert_after_line(line, lines)
             return
         ctx.inline(start, end, lead + render.render_inline(value, style, in_flow=False))
@@ -535,6 +579,8 @@ def _replace_block_scalar(
         ):
             digit = str(block.content_column - owner_column)
         header = block.indicator + digit + chomp
+        if isinstance(value, NewScalar) and value.tag:
+            header = render.tagged(value, header)
         if header != ctx.text[block.header_start : block.header_end]:
             ctx.inline(block.header_start, block.header_end, header)
         last = block.last_block if "+" in (block.chomp, chomp) else block.last_text
@@ -586,7 +632,7 @@ def _replace_collection(
                 and render.literal_representable(text_value)
             ):
                 header, lines = render.render_literal(text_value, owner_column + ctx.step, ctx.step)
-                ctx.inline(target.start, target.end, header)
+                ctx.inline(target.start, target.end, render.tagged(value, header))
                 ctx.insert_after_line(ctx.lines.index_of(target.end), lines)
                 return
             ctx.inline(target.start, target.end, render.render_inline(value, None, in_flow=False))
@@ -615,6 +661,7 @@ def _replace_collection(
             and render.literal_representable(text_value)
         ):
             header, lines = render.render_literal(text_value, owner_column + ctx.step, ctx.step)
+            header = render.tagged(value, header)
         else:
             header, lines = render.render_inline(value, None, in_flow=False), []
     else:
