@@ -32,7 +32,10 @@ def source_label(theatre: Path, file: SourceFile) -> str:
 
     Loaded files are known by their real path, so the theatre is taken at its real path too
     (spec D-22): a theatre reached through a linked directory still gives `.troupe/...`.
+    A fetched value is labelled with its URL as written (step 7 FR-604).
     """
+    if isinstance(file.path, str):
+        return file.path
     return os.path.relpath(file.path, theatre.resolve()).replace(os.sep, "/")
 
 

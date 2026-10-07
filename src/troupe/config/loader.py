@@ -10,7 +10,8 @@ from ruamel.yaml.error import YAMLError
 from ruamel.yaml.events import AliasEvent
 from ruamel.yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
-from troupe.config.files import SourceFile, find_config, is_yaml_name, read_source
+from troupe.config.fetch import fetch
+from troupe.config.files import SourceFile, find_config, is_yaml_name, is_yaml_url, read_source
 from troupe.config.includes import LITERAL_TAG, REF_KEY, FileRef, UrlRef, include_ref
 from troupe.config.scalars import ALIAS_NAME, ALIAS_TARGET, resolve_node
 from troupe.config.schema import SubSchema, is_uri, schema_child
@@ -113,6 +114,20 @@ class _Loader:
                 self.files[key] = read_source(key)
         return self.files[key]
 
+    def remote_source(self, url: str, included_from: str) -> SourceFile:
+        """The fetched document at `url`, fetched at most once per command (spec D-62)."""
+        if url not in self.fetched:
+            kind: Literal["yaml", "text"] = "yaml" if is_yaml_url(url) else "text"
+            self.fetched[url] = SourceFile(url, fetch(url, included_from), kind)
+        source = self.fetched[url]
+        if source.kind == "yaml":
+            try:
+                self.composed_root(source)
+            except LoadError as error:
+                # Name the include's file too: the user can change only that (spec FR-602).
+                raise LoadError(f"{included_from}: {error.message}") from None
+        return source
+
     def composed_root(self, source: SourceFile) -> Any:
         if source.path not in self.composed:
             self.composed[source.path] = compose(source)
@@ -137,8 +152,7 @@ class _Loader:
         a literal — tagged `!literal`, or `format: uri` in its subschema `sub` (spec FR-620)."""
         if scalar.node.tag == LITERAL_TAG or is_uri(sub):
             return None
-        ref = include_ref(scalar.value)
-        return ref if isinstance(ref, FileRef) else None
+        return include_ref(scalar.value)
 
     def build(
         self,
@@ -231,7 +245,11 @@ class _Loader:
     ) -> Located:
         """The content `scalar` includes, at a place whose subschema is `sub`."""
         if isinstance(ref, UrlRef):
-            raise AssertionError("URL includes are followed from step 7 US1")
+            # URLs are compared as written: a cycle is the same string met again (step 1 FR-012).
+            if ref.url in chain:
+                raise LoadError(f"{scalar.file.path}: include cycle through {ref.url}")
+            source = self.remote_source(ref.url, str(scalar.file.path))
+            return self.embed(scalar, source, (*chain, ref.url), sub)
         if isinstance(scalar.file.path, str):
             # Remote content may not reach into the user's disk (spec D-61).
             raise LoadError(

@@ -101,7 +101,7 @@ existing test stays green after each task.
 **Independent Test**: serve fixtures with `web`; `get`/`show`/`--sources`/`history` give the
 expected configuration; each failure kind exits 4.
 
-- [ ] T007 [P] [US1] Create `tests/e2e/test_remote_read.py` (tests first):
+- [X] T007 [P] [US1] Create `tests/e2e/test_remote_read.py` (tests first):
   - **Scenario 1:** `web.write("agents.yaml", "coder:\n  model: opus\n")`; `troupe.yml` `agents: <url>\n`; `get agents.coder.model` → `opus\n` (FR-600, FR-601).
   - **Scenario 2:** text include, `system.md` = `Be brief.\n` → `get prompt` prints it exactly. Also `test_text_include_keeps_crlf` (`"a\r\nb\r\n"` read back unchanged via `show prompt`).
   - **Scenario 3:** `agents.yaml?rev=3` is read as YAML; `web.requests` contains `/agents.yaml?rev=3`.
@@ -116,7 +116,7 @@ expected configuration; each failure kind exits 4.
   - `test_redirect_is_followed` (`/redirect/agents.yaml`; D-63).
   - `test_https_include` (uses `web_tls`, passing `env=web_tls.env`).
   - `test_remote_change_is_reconciled_as_file` (load once, change the served file, run `get`; the last history event has `via` `file`, `op` `set`, and actor `{"kind": "unknown", "id": None}`; D-65).
-- [ ] T008 [P] [US1] Create `tests/e2e/test_remote_errors.py` (tests first). Each test uses `assert_failed(result, 4, <url>)`, checks that stderr also names `.troupe/troupe.yml` (or the file holding the include), and that `theatre.snapshot()` is unchanged (FR-602, FR-650):
+- [X] T008 [P] [US1] Create `tests/e2e/test_remote_errors.py` (tests first). Each test uses `assert_failed(result, 4, <url>)`, checks that stderr also names `.troupe/troupe.yml` (or the file holding the include), and that `theatre.snapshot()` is unchanged (FR-602, FR-650):
   - `test_connection_refused` (a URL on a closed port: bind then close a socket to get one).
   - `test_status_404`, `test_status_500`.
   - `test_non_utf8_body` (`web.write("a.md", b"\xff\xfe")`).
@@ -127,12 +127,12 @@ expected configuration; each failure kind exits 4.
   - `test_url_include_cycle` (`a.yaml` includes `b.yaml`, which includes `a.yaml`).
   - `test_https_with_untrusted_certificate` (`web_tls` without `SSL_CERT_FILE` → exit 4).
   - Run every command (`get a`, `show`, `history`, `set a 1`) against one failing fixture: each exits 4.
-- [ ] T009 [US1] Create `src/troupe/config/fetch.py` (research U-3):
+- [X] T009 [US1] Create `src/troupe/config/fetch.py` (research U-3):
   - `FETCH_TIMEOUT = 10.0` with the comment "spec D-63".
   - `fetch(url: str, included_from: str) -> str`: `urllib.request.urlopen(url, timeout=remaining)`, then read in 64 KiB chunks until EOF, raising if `time.monotonic()` passes the deadline. Require `200 <= status < 300`, then decode with `.decode("utf-8")` (strict).
   - Map `HTTPError` → `LoadError(f"{included_from}: cannot fetch {url}: HTTP {code}")`. Map `URLError`/`OSError`/`TimeoutError`/deadline/`UnicodeDecodeError` → `LoadError(f"{included_from}: cannot fetch {url}: {reason}")`.
   - Add the docstring "redirects followed, 2xx only, no cache, no retries (spec D-63); proxies from the environment".
-- [ ] T010 [US1] In `src/troupe/config/loader.py` (research U-3, U-4):
+- [X] T010 [US1] In `src/troupe/config/loader.py` (research U-3, U-4):
   - `is_include` now also returns `UrlRef` (still no literal rules; those come in US3).
   - `include()` dispatches:
     - A `FileRef` from a source whose `path` is a `str`: `LoadError(f"{url}: file: include {value!r} in remote content is not allowed")` (D-61).
@@ -141,7 +141,7 @@ expected configuration; each failure kind exits 4.
   - `Loaded.remote = self.fetched`. Fetched sources are not added to `Loaded.files`, so `watch` never reads URLs (D-65).
   - `apply._reload` passes `fetched=loaded.remote` (D-62).
   - Run T007/T008 to green.
-- [ ] T011 [US1] In `src/troupe/config/view.py` `source_label`: `return file.path if isinstance(file.path, str) else <existing relpath>`, with the comment "a fetched value is labelled with its URL as written (spec FR-604)". Run T007 scenario 4 to green.
+- [X] T011 [US1] In `src/troupe/config/view.py` `source_label`: `return file.path if isinstance(file.path, str) else <existing relpath>`, with the comment "a fetched value is labelled with its URL as written (spec FR-604)". Run T007 scenario 4 to green.
 
 **Checkpoint**: MVP: URL includes load everywhere; failures are exit 4.
 
