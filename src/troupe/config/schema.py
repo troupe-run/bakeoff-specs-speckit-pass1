@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
-from jsonschema.exceptions import SchemaError
+from jsonschema.exceptions import SchemaError, best_match
 
 from troupe.config.files import TROUPE_DIR, read_source
 from troupe.errors import LoadError
@@ -29,6 +29,16 @@ type SubSchema = dict[str, Any] | None
 class Schema:
     path: Path
     document: dict[str, Any]
+
+    def validate(self, value: object) -> None:
+        """Raise LoadError (exit 4) naming this file and a failing path if `value` — the loaded
+        configuration — does not validate (FR-631). `format` is an annotation only (D-64), so no
+        format checker is given."""
+        error = best_match(Draft202012Validator(self.document).iter_errors(value))
+        if error is None:
+            return
+        where = ".".join(str(part) for part in error.absolute_path) or "the top level"
+        raise LoadError(f"{self.path}: {where}: {error.message}")
 
 
 def schema_path(theatre: Path) -> Path:

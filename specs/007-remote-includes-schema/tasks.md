@@ -231,7 +231,7 @@ a literal; nothing is fetched or read for it.
 **Independent Test**: schema with `type`/`enum` constraints; invalid fixtures exit 4; invalid `set`
 exits 3 with no change.
 
-- [ ] T018 [P] [US4] Create `tests/e2e/test_schema_validation.py` (tests first). The schema is `{"properties": {"temperature": {"type": "number"}, "agents": {"additionalProperties": {"properties": {"model": {"enum": ["opus", "sonnet"]}}}}}}`.
+- [X] T018 [P] [US4] Create `tests/e2e/test_schema_validation.py` (tests first). The schema is `{"properties": {"temperature": {"type": "number"}, "agents": {"additionalProperties": {"properties": {"model": {"enum": ["opus", "sonnet"]}}}}}}`.
   - **Scenario 1:** `temperature: warm` → every command (`get temperature`, `show`, `history`, `set x 1`) gives `assert_failed(r, 4, "troupe.schema.json")`, and stderr contains `temperature` (FR-631).
   - **Scenario 2:** `assert_refused(..., "temperature", "warm", 3, "troupe.schema.json")`, stderr contains `temperature`, and history is unchanged (FR-633).
   - **Scenario 3:** `set temperature 0.5` succeeds.
@@ -243,7 +243,7 @@ exits 3 with no change.
   - `test_validation_sees_merged_overrides` (the override makes an invalid value valid → loads).
   - `test_text_include_validated_as_string`.
   - `test_watch_reports_invalid_then_recovers` (with `start_watch`: an invalid hand edit is reported on stderr, a valid edit is then recorded; step 2 D-13).
-- [ ] T019 [US4] In `src/troupe/config/schema.py` add `Schema.validate(self, value: Value) -> None`. It uses `Draft202012Validator(self.document)` with no `format_checker`, takes `best_match(validator.iter_errors(value))`, and raises `LoadError(f"{self.path}: {dotted or 'the top level'}: {error.message}")`, where `dotted` is `".".join(str(p) for p in error.absolute_path)`. Comment: "format is an annotation only (spec D-64)".
+- [X] T019 [US4] In `src/troupe/config/schema.py` add `Schema.validate(self, value: Value) -> None`. It uses `Draft202012Validator(self.document)` with no `format_checker`, takes `best_match(validator.iter_errors(value))`, and raises `LoadError(f"{self.path}: {dotted or 'the top level'}: {error.message}")`, where `dotted` is `".".join(str(p) for p in error.absolute_path)`. Comment: "format is an annotation only (spec D-64)".
   - In `loader.load`, after building, call `schema.validate(to_value(root))` when a schema exists (FR-631).
   - Confirm that `apply._reload` turns the failure into exit 3 whose message contains PATH and the schema file name (FR-633); if not, add the schema file to the `WriteRefused` text there.
   - Run T018 to green.

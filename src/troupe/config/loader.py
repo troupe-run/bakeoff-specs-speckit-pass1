@@ -13,6 +13,7 @@ from ruamel.yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 from troupe.config.fetch import fetch
 from troupe.config.files import SourceFile, find_config, is_yaml_name, is_yaml_url, read_source
 from troupe.config.includes import LITERAL_TAG, REF_KEY, FileRef, UrlRef, include_ref
+from troupe.config.leaves import to_value
 from troupe.config.scalars import ALIAS_NAME, ALIAS_TARGET, resolve_node
 from troupe.config.schema import Schema, SubSchema, is_uri, load_schema, schema_child
 from troupe.config.tree import (
@@ -147,6 +148,10 @@ class _Loader:
             root = located
         else:
             raise LoadError(f"{source.path}: the top level must be a mapping")
+        if self.schema is not None:
+            # Every command loads through here, so an invalid configuration cannot be used, and
+            # a `set` whose re-check fails here is refused (spec FR-631, FR-633; research U-6).
+            self.schema.validate(to_value(root))
         return Loaded(root, self.files, self.composed, self.fetched, self.schema)
 
     def is_include(self, scalar: LocatedScalar, sub: SubSchema) -> FileRef | UrlRef | None:
