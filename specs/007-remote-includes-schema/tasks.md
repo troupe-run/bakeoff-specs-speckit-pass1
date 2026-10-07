@@ -332,3 +332,34 @@ exits 3 with no change.
   `local_path`, with a raw message.
 - **Then**: US3 (protects existing URL settings), US4, US5.
 - Commit at each checkpoint, with a message that says why (Principle VI).
+
+---
+
+## Phase 9: Convergence
+
+- [ ] T028 CRITICAL: add tests for three behaviours that work but are untested.
+  - In `tests/e2e/test_remote_readonly.py`, add `test_mapping_form_remote_include_names_the_ref_line`: `troupe.yml` `a: 1\ncoder:\n  $ref: <url>/c.yaml\n  effort: low\n`, with remote `model: opus`. `set coder.model x` must exit 3, with stderr containing the URL, `.troupe/troupe.yml` and `line 3`; no file or event may change. Also `set coder.effort high` must change only the local override.
+  - In `tests/e2e/test_literals.py`, add `test_literal_tag_on_a_folded_scalar`: `a: !literal >-\n  https://x\n  y\n` must give `get a` = `https://x y`, with nothing fetched.
+  - In `tests/e2e/test_schema_validation.py`, add a `{"$dynamicRef": "https://example.com/s.json"}` case to `test_unusable_schema_cannot_load`.
+  - Break each behaviour once to confirm its test fails.
+  - Per Constitution II, FR-611, FR-622, FR-630 (partial)
+- [ ] T029 Stop `watch` fetching a failing URL on every poll. In `src/troupe/config/watch.py` `run_watch`, a broken configuration whose last error was a failed fetch must be retried only when a watched local file (or the schema file) changes, not on every `POLL_INTERVAL`.
+  - Keep step 2 D-13 behaviour for broken local files.
+  - Decide how the failure kind is known in one place: for example a `FetchError(LoadError)` subclass raised by `fetch.py`.
+  - Add `tests/e2e/test_remote_watch.py`:
+    - `test_watch_reports_a_failed_fetch_and_keeps_running`: stderr names the URL and the watcher is still running.
+    - `test_watch_does_not_poll_a_failing_url`: with `web` serving `/status/404`, `web.requests` grows by at most 1 over 2 s with no local edit.
+    - `test_watch_recovers_after_a_local_edit_once_the_url_serves`.
+  - Per D-65 and the spec edge case on `watch` (contradicts)
+- [ ] T030 Make `set --include` remove an existing `!literal` tag on a block (`|`/`>`) or empty scalar instead of refusing. In `src/troupe/config/edit/planner.py` `_literal_tag`/`_replace_block_scalar`/`_replace_scalar`, start the replaced span at the tag, so the tag and its following space go and the include string is written inline, with the old block content lines dropped (as the non-block branch of `_replace_block_scalar` does).
+  - Add to `tests/e2e/test_set_literal.py` `test_include_flag_removes_a_tag_on_a_literal_block` (`a: !literal |\n  old\n` + `set --include a <web url>/d.md` → `a: <url>\n`) and `test_include_flag_removes_a_tag_on_an_empty_value`. Check exact bytes with `assert_set`.
+  - Per FR-644 (contradicts)
+- [ ] T031 Name the local include line when a nested remote include fails to fetch. In `src/troupe/config/loader.py`, carry the outermost local include scalar down the chain of remote documents, so the `LoadError` from `fetch()` or from invalid YAML also says `(included through <string as written> at line N of <file>)`. Reuse `remote.as_written` and `view.source_label`, moving shared helpers to one place if an import cycle forces it.
+  - Add `test_nested_fetch_failure_names_the_local_include` to `tests/e2e/test_remote_errors.py`: `troupe.yml` `x: <url>/a.yaml` and `a.yaml` `b: <url>/status/404` → exit 4, with stderr containing both URLs and `.troupe/troupe.yml`.
+  - Per FR-602, FR-611 (partial)
+- [ ] T032 Record the decisions made during implementation in `specs/007-remote-includes-schema/research.md` as a new entry `U-13 Decisions made while implementing`:
+  - Alias expansion keeps `!literal` tags in the copy (`edit/alias._copy`), so the copy reads back as the same value.
+  - `types-jsonschema` was added as a dev dependency for `mypy --strict`.
+  - The `--include` tag-removal approach from T030.
+  - The `FetchError` distinction from T029.
+  - Per Constitution VI and plan: research decisions (unrequested)
