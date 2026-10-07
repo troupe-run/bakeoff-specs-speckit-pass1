@@ -98,3 +98,23 @@ def test_the_including_file_is_named(theatre: Theatre, web: Web) -> None:
     theatre.write("troupe.yml", "a: file:inc.yaml\n")
     theatre.write("inc.yaml", f"x: {url}\n")
     _assert_fetch_error(theatre, url, holder="inc.yaml")
+
+
+def test_nested_fetch_failure_names_the_local_include(theatre: Theatre, web: Web) -> None:
+    outer, inner = web.url("a.yaml"), web.url("status/404")
+    web.write("a.yaml", f"b: {inner}\n")
+    theatre.write("troupe.yml", f"z: 0\nx: '{outer}'\n")
+    result = theatre.config("get", "z")
+    assert_failed(result, 4, inner)
+    assert f"included through {outer} at line 2 of" in result.err, result
+    assert ".troupe/troupe.yml" in result.err
+
+
+def test_nested_invalid_yaml_names_the_local_include(theatre: Theatre, web: Web) -> None:
+    outer, inner = web.url("a.yaml"), web.url("b.yaml")
+    web.write("a.yaml", f"b: {inner}\n")
+    web.write("b.yaml", "k: [\n")
+    theatre.write("troupe.yml", f"x: {outer}\n")
+    result = theatre.config("get", "x")
+    assert_failed(result, 4, inner)
+    assert f"included through {outer} at line 1 of" in result.err, result

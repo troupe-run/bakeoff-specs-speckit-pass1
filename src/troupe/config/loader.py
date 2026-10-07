@@ -22,6 +22,7 @@ from troupe.config.tree import (
     LocatedScalar,
     LocatedSequence,
     TextInclude,
+    as_written,
 )
 from troupe.errors import LoadError
 
@@ -104,6 +105,8 @@ class _Loader:
         self.files: dict[Path, SourceFile] = {}
         self.composed: dict[Path | str, Any] = {}
         self.fetched = dict(fetched)
+        # For each fetched URL, the include string in a local file it is reached through.
+        self.local_sites: dict[str, LocatedScalar] = {}
         self.schema = schema
 
     def source(self, path: Path) -> SourceFile:
@@ -116,8 +119,22 @@ class _Loader:
                 self.files[key] = read_source(key)
         return self.files[key]
 
-    def remote_source(self, url: str, included_from: str) -> SourceFile:
-        """The fetched document at `url`, fetched at most once per command (spec D-62)."""
+    def remote_source(self, url: str, scalar: LocatedScalar) -> SourceFile:
+        """The fetched document at `url`, included by `scalar`; fetched at most once per command
+        (spec D-62)."""
+        site = (
+            scalar if isinstance(scalar.file.path, Path) else self.local_sites.get(scalar.file.path)
+        )
+        if site is not None:
+            self.local_sites.setdefault(url, site)
+        included_from = str(scalar.file.path)
+        if site is not None and site is not scalar:
+            # Nested remote includes: also name the local include line, the one the user can
+            # change (spec FR-602, FR-611).
+            included_from += (
+                f" (included through {as_written(site)} at line "
+                f"{int(site.node.start_mark.line) + 1} of {site.file.path})"
+            )
         if url not in self.fetched:
             kind: Literal["yaml", "text"] = "yaml" if is_yaml_url(url) else "text"
             self.fetched[url] = SourceFile(url, fetch(url, included_from), kind)
@@ -255,7 +272,7 @@ class _Loader:
             # URLs are compared as written: a cycle is the same string met again (step 1 FR-012).
             if ref.url in chain:
                 raise LoadError(f"{scalar.file.path}: include cycle through {ref.url}")
-            source = self.remote_source(ref.url, str(scalar.file.path))
+            source = self.remote_source(ref.url, scalar)
             return self.embed(scalar, source, (*chain, ref.url), sub)
         if isinstance(scalar.file.path, str):
             # Remote content may not reach into the user's disk (spec D-61).

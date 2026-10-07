@@ -10,11 +10,16 @@ from pathlib import Path
 
 from troupe.config.loader import Loaded
 from troupe.config.paths import ConfigPath, is_index
-from troupe.config.tree import Located, LocatedMapping, LocatedScalar, LocatedSequence, TextInclude
+from troupe.config.tree import (
+    Located,
+    LocatedMapping,
+    LocatedScalar,
+    LocatedSequence,
+    TextInclude,
+    as_written,
+)
 from troupe.config.view import source_label
 from troupe.errors import WriteRefused
-
-_QUOTES = ('"', "'")
 
 
 def remote_site(loaded: Loaded, path: ConfigPath) -> LocatedScalar | None:
@@ -48,14 +53,6 @@ def _include_string(node: Located) -> LocatedScalar | None:
 def _is_remote(node: Located) -> bool:
     source = node.target if isinstance(node, TextInclude) else node.file
     return isinstance(source.path, str)
-
-
-def as_written(scalar: LocatedScalar) -> str:
-    """The include string as written in its file, without quotes (spec D-70)."""
-    text = scalar.file.text[scalar.start : scalar.end]
-    if scalar.style in _QUOTES and len(text) >= 2:
-        return text[1:-1]
-    return text
 
 
 def refuse_remote(loaded: Loaded, path: ConfigPath, theatre: Path) -> WriteRefused | None:

@@ -109,6 +109,17 @@ class TextInclude:
 
 type Located = LocatedScalar | LocatedMapping | LocatedSequence | TextInclude
 
+_QUOTES = ('"', "'")
+
+
+def as_written(scalar: LocatedScalar) -> str:
+    """A scalar's text as written in its file, without quotes: how messages show an include
+    string (step 7 D-70)."""
+    text = scalar.file.text[scalar.start : scalar.end]
+    if scalar.style in _QUOTES and len(text) >= 2:
+        return text[1:-1]
+    return text
+
 
 def shared_part(mapping: LocatedMapping) -> LocatedMapping:
     """A merged mapping's part written in the included file, before any override (step 5 CR-B
