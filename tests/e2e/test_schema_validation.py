@@ -68,6 +68,7 @@ def test_invalid_remote_content_cannot_load(theatre: Theatre, web: Web) -> None:
         {"$schema": "http://json-schema.org/draft-07/schema#"},
         {"$ref": "https://example.com/s.json"},
         {"properties": {"a": {"$ref": "other.json#/x"}}},
+        {"$dynamicRef": "https://example.com/s.json"},
     ],
 )
 def test_unusable_schema_cannot_load(theatre: Theatre, schema: Any) -> None:

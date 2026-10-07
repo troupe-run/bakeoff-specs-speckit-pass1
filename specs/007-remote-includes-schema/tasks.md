@@ -337,7 +337,7 @@ exits 3 with no change.
 
 ## Phase 9: Convergence
 
-- [ ] T028 CRITICAL: add tests for three behaviours that work but are untested.
+- [X] T028 CRITICAL: add tests for three behaviours that work but are untested.
   - In `tests/e2e/test_remote_readonly.py`, add `test_mapping_form_remote_include_names_the_ref_line`: `troupe.yml` `a: 1\ncoder:\n  $ref: <url>/c.yaml\n  effort: low\n`, with remote `model: opus`. `set coder.model x` must exit 3, with stderr containing the URL, `.troupe/troupe.yml` and `line 3`; no file or event may change. Also `set coder.effort high` must change only the local override.
   - In `tests/e2e/test_literals.py`, add `test_literal_tag_on_a_folded_scalar`: `a: !literal >-\n  https://x\n  y\n` must give `get a` = `https://x y`, with nothing fetched.
   - In `tests/e2e/test_schema_validation.py`, add a `{"$dynamicRef": "https://example.com/s.json"}` case to `test_unusable_schema_cannot_load`.

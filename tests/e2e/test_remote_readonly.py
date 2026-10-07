@@ -129,3 +129,14 @@ def test_quoted_include_is_shown_without_its_quotes(theatre: Theatre, url: str) 
     theatre.write("troupe.yml", f"a: '{url}'\n")
     result = theatre.config("set", "a.model", "x")
     assert f"remote include {url} (" in result.err, result
+
+
+def test_mapping_form_remote_include_names_the_ref_line(theatre: Theatre, web: Web) -> None:
+    web.write("c.yaml", "model: opus\n")
+    url = web.url("c.yaml")
+    files = {"troupe.yml": f"a: 1\ncoder:\n  $ref: {url}\n  effort: low\n"}
+    assert_remote_refused(theatre, files, "coder.model", "x", url, ".troupe/troupe.yml", 3)
+    assert_set(
+        theatre, {}, "coder.effort", "high",
+        {"troupe.yml": f"a: 1\ncoder:\n  $ref: {url}\n  effort: high\n"},
+    )  # fmt: skip

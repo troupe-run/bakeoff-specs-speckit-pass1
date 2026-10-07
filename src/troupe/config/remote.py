@@ -8,7 +8,6 @@ brings in remote content. With nested remote includes that is the outermost one.
 
 from pathlib import Path
 
-from troupe.config.includes import REF_KEY
 from troupe.config.loader import Loaded
 from troupe.config.paths import ConfigPath, is_index
 from troupe.config.tree import Located, LocatedMapping, LocatedScalar, LocatedSequence, TextInclude
@@ -39,10 +38,8 @@ def remote_site(loaded: Loaded, path: ConfigPath) -> LocatedScalar | None:
 
 
 def _include_string(node: Located) -> LocatedScalar | None:
-    """The include string of an include root: the scalar-form string, or the `$ref` value."""
-    if node.include_site is not None:
-        ref = node.include_site.get(REF_KEY)
-        return ref if isinstance(ref, LocatedScalar) else None
+    """The include string of an include root: the scalar-form string, or the `$ref` value (the
+    loader sets `included_by` to it in mapping form too, step 5 research O-2)."""
     if isinstance(node, TextInclude):
         return node.include
     return node.included_by

@@ -137,3 +137,10 @@ def test_watch_sees_the_schema_file(
         return any((e["op"], e["path"], e["new"]) == ("set", "a", url) for e in events)
 
     wait_for_history(theatre, literal_recorded, since)
+
+
+def test_literal_tag_on_a_folded_scalar(theatre: Theatre, web: Web) -> None:
+    url = web.url("x.yaml")
+    theatre.write("troupe.yml", f"a: !literal >-\n  {url}\n  y\n")
+    assert theatre.config("get", "a").out == f"{url} y\n"
+    assert web.requests == []
