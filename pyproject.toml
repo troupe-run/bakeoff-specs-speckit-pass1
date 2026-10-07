@@ -5,6 +5,7 @@ description = "troupe configuration subsystem: load, show, set and history of a 
 requires-python = ">=3.12"
 dependencies = [
     "eventsourcing>=9.5",
+    "jsonschema>=4.23",
     "ruamel-yaml>=0.18",
 ]
 
@@ -34,4 +35,5 @@ dev = [
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "ruff>=0.16.10",
+    "types-jsonschema>=4.26.0.20261006",
 ]
